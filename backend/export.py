@@ -401,24 +401,19 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                 ]))
                 
                 story.append(table)
-                story.append(Spacer(1, 0.4 * inch))
-                
-                # Add page break after every 2 teachers
+
+                # Add spacing when there is more content to follow
+                if idx != len(teacher_ids) - 1 or (class_timetable and len(class_timetable) > 0):
+                    story.append(Spacer(1, 0.4 * inch))
+
+                # Add page break after every 2 teachers when there are more teachers remaining
                 if (idx + 1) % 2 == 0 and idx != len(teacher_ids) - 1:
                     story.append(PageBreak())
                     story.append(Paragraph("TEACHER TIMETABLES", section_style))
-                
-                print(f"Exported teacher {teacher_id}: {teacher.name}")
-                exported_teachers += 1
-                
-            except Exception as e:
-                print(f"Error exporting teacher {teacher_id}: {str(e)}")
-                raise
 
-                
                 print(f"Exported teacher {teacher_id}: {teacher.name}")
                 exported_teachers += 1
-                
+
             except Exception as e:
                 print(f"Error exporting teacher {teacher_id}: {str(e)}")
                 raise
@@ -480,16 +475,19 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                     ]))
                     
                     story.append(table)
-                    story.append(Spacer(1, 0.4 * inch))
-                    
-                    # Force two classes per PDF page
+
+                    # Add spacing when there are more class schedules following
+                    if idx != len(class_names) - 1:
+                        story.append(Spacer(1, 0.4 * inch))
+
+                    # Force two classes per PDF page when more classes remain
                     if (idx + 1) % 2 == 0 and idx != len(class_names) - 1:
                         story.append(PageBreak())
                         story.append(Paragraph("STUDENT/CLASS TIMETABLES", section_style))
-                    
+
                     print(f"Exported class {class_name}")
                     exported_classes += 1
-                    
+
                 except Exception as e:
                     print(f"Error exporting class {class_name}: {str(e)}")
                     raise
