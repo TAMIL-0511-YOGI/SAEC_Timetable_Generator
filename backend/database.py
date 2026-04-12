@@ -114,6 +114,26 @@ def delete_subject(subject_id):
     conn.commit()
     conn.close()
 
+
+def delete_teacher(teacher_id):
+    """Delete teacher and associated subjects"""
+    conn = connect()
+    c = conn.cursor()
+    c.execute("DELETE FROM subjects WHERE teacher_id = ?", (teacher_id,))
+    c.execute("DELETE FROM teachers WHERE teacher_id = ?", (teacher_id,))
+    conn.commit()
+    conn.close()
+
+
+def update_teacher(teacher_id, name):
+    """Update teacher name"""
+    conn = connect()
+    c = conn.cursor()
+    c.execute("UPDATE teachers SET name = ? WHERE teacher_id = ?", (name, teacher_id))
+    conn.commit()
+    conn.close()
+
+
 def update_subject(subject_id, subject_name, year, section, hours_per_week, is_lab=0):
     """Update a specific subject"""
     conn = connect()

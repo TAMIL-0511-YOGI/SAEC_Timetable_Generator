@@ -7,20 +7,29 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="college-topbar">
+        <img src="https://images.shiksha.com/mediadata/images/1655977206phpUphFuL.jpeg" alt="S. A. Engineering College Logo" class="college-logo" onerror="this.onerror=null; this.src='https://via.placeholder.com/80?text=SA+College';">
+        <div class="college-title">
+            <h1>S. A. ENGINEERING COLLEGE (AUTONOMOUS)</h1>
+            <p>Accredited by NBA, NAAC 'A' Grade & ISO 9001:2015 Certified Institution</p>
+            <p class="college-subtitle">AI-Powered Timetable Management System</p>
+        </div>
+    </div>
+
     <div class="container">
         <header>
             <h1>AI Assisted Timetable Management System</h1>
             <p>Intelligent Faculty Schedule Generator</p>
         </header>
 
-        <main>
+        <main id="mainContent">
             <!-- Teacher Input Section -->
             <section class="section">
                 <h2>Add Teacher</h2>
                 <div class="form-group">
                     <input type="text" id="teacherId" placeholder="Teacher ID (e.g., T001)" required>
                     <input type="text" id="teacherName" placeholder="Teacher Name" required>
-                    <button onclick="addTeacher()">Add Teacher</button>
+                    <button onclick="addTeacher()" class="btn-primary">Add Teacher</button>
                 </div>
                 <div id="teacherMessage" class="message"></div>
             </section>
@@ -28,7 +37,7 @@
             <!-- Subject Input Section -->
             <section class="section">
                 <h2>Add Subject to Teacher</h2>
-                <div class="form-group">
+                <div class="form-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                     <select id="teacherSelect" required>
                         <option value="">Select Teacher</option>
                     </select>
@@ -36,18 +45,29 @@
                     <input type="number" id="yearLevel" min="1" max="4" placeholder="Year Level (1-4)" required>
                     <input type="text" id="section" placeholder="Section (A, B, C, etc.)" required>
                     <input type="number" id="hoursPerWeek" min="1" placeholder="Hours per Week" required>
-                    <label>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; margin-top: 8px; padding: 8px; background-color: #f5f5f5; border-radius: 4px;">
+                    <label style="display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 500;">
                         <input type="checkbox" id="isLab"> Is Lab Period?
                     </label>
-                    <button onclick="addSubject()">Add Subject</button>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
+                    <button onclick="addSubject()" class="btn-primary" style="width: 160px;">Add Subject</button>
                 </div>
                 <div id="subjectMessage" class="message"></div>
             </section>
 
-            <!-- Teachers and Subjects List -->
-            <section class="section">
-                <h2>Teachers and Subjects</h2>
-                <div id="teachersList" class="teachers-list"></div>
+            <!-- Teachers and Subjects (Database Toggle) -->
+            <section class="section" style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                <h2 style="margin:0;">Teachers and Subjects</h2>
+                <button class="btn-secondary" onclick="openTeacherDatabase()">Open Teacher Database</button>
+            </section>
+            <div id="teachersList" class="teachers-list" style="display:none;"></div>
+
+            <!-- Institutional Activities (Database Toggle) -->
+            <section class="section" style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                <h2 style="margin:0;">Institutional Activities</h2>
+                <button class="btn-secondary" onclick="openActivityDatabase()">Activity Database</button>
             </section>
 
             <!-- Generate and Download Section -->
@@ -71,6 +91,220 @@
                 <div id="downloadMessage" class="message"></div>
             </section>
         </main>
+
+        <section class="section" id="teacherDatabaseSection" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <h2>Teacher Database</h2>
+                <button onclick="closeTeacherDatabase()" class="btn-secondary">Back</button>
+            </div>
+            <div id="teacherDatabaseContent"></div>
+        </section>
+    </div>
+
+    <!-- Activity Database Section -->
+    <section class="section" id="activityDatabaseSection" style="display:none; margin: 0 auto; max-width: 1200px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 style="margin: 0;">Activity Database</h2>
+            <button onclick="closeActivityDatabase()" class="btn-secondary">Back</button>
+        </div>
+        
+        <!-- Activity Form -->
+        <div style="background-color: #f9f9f9; padding: 24px; border-radius: 6px; margin-bottom: 24px;">
+            <h3 style="margin-top: 0;">Add New Activity</h3>
+            <div class="form-grid">
+                <div>
+                    <label for="activityDay">Day</label>
+                    <select id="activityDay">
+                        <option value="Mon">Mon</option>
+                        <option value="Tue">Tue</option>
+                        <option value="Wed">Wed</option>
+                        <option value="Thu">Thu</option>
+                        <option value="Fri">Fri</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="activityYear">Student Year</label>
+                    <select id="activityYear">
+                        <option value="2">2nd Year</option>
+                        <option value="3">3rd Year</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="activitySection">Section</label>
+                    <select id="activitySection">
+                        <option value="">Select Section</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="D">D</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="activityPeriod">Period (1-8)</label>
+                    <input type="number" id="activityPeriod" min="1" max="8" placeholder="Period" />
+                </div>
+                <div>
+                    <label for="activityHours">Hours</label>
+                    <input type="number" id="activityHours" min="1" max="30" placeholder="1" />
+                </div>
+                <div>
+                    <label for="activityType">Activity Type</label>
+                    <select id="activityType">
+                        <option value="PT">Physical Training (PT)</option>
+                        <option value="Library">Library</option>
+                        <option value="Professional Elective">Professional Elective</option>
+                        <option value="Open Elective">Open Elective</option>
+                        <option value="Mini Project">Mini Project</option>
+                        <option value="Skillrack/Placement">Skillrack/Placement</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="profElectiveName">Elective Subject</label>
+                    <input type="text" id="profElectiveName" placeholder="Elective Subject" />
+                </div>
+                <div>
+                    <label for="electiveSubjectNo">Elective No.</label>
+                    <input type="number" id="electiveSubjectNo" placeholder="No." min="1" />
+                </div>
+            </div>
+
+            <div style="margin-top: 12px;">
+                <label style="display: inline-flex; align-items: center; gap: 6px; font-weight: 500;">
+                    <input type="checkbox" id="activityThreePeriod" /> 3-Consecutive Period?
+                </label>
+            </div>
+
+            <div style="margin-top: 12px; padding: 8px; background-color: #fff3cd; border-radius: 4px;">
+                <label style="display: inline-flex; align-items: center; gap: 6px; font-weight: 500;">
+                    <input type="checkbox" id="activityMultipleOccurrences" /> Multiple Times/Week (Mini Project)
+                    <select id="activityOccurrenceCount" style="width: 80px; padding: 4px; margin-left: 4px;">
+                        <option value="2">2 times</option>
+                        <option value="3">3 times</option>
+                    </select>
+                </label>
+            </div>
+
+            <h4 style="margin-top: 16px; margin-bottom: 12px;">Teachers (Up to 10)</h4>
+            <div class="teacher-grid">
+                <select class="teacher-select" id="multiTeacher1"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="multiTeacher2"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="multiTeacher3"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="multiTeacher4"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="multiTeacher5"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="multiTeacher6"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="multiTeacher7"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="multiTeacher8"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="multiTeacher9"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="multiTeacher10"><option value="">Select Teacher</option></select>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px;">
+                <button onclick="addActivity()" class="btn-primary">Add Activity</button>
+            </div>
+        </div>
+
+        <!-- Activity List -->
+        <div style="margin-bottom: -30px; padding-bottom: 30px;">
+            <h3 style="margin-top: 0; margin-bottom: 12px;">Added Activities</h3>
+            <div id="activityList" class="activity-list"></div>
+        </div>
+    </section>
+
+    <div id="editActivityModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditActivityModal()">&times;</span>
+            <h2>Edit Activity</h2>
+            <input type="hidden" id="editActivityIndex">
+            <div class="form-grid">
+                <div>
+                    <label for="editActivityDay">Day</label>
+                    <select id="editActivityDay">
+                        <option value="Mon">Mon</option>
+                        <option value="Tue">Tue</option>
+                        <option value="Wed">Wed</option>
+                        <option value="Thu">Thu</option>
+                        <option value="Fri">Fri</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="editActivityYear">Student Year</label>
+                    <select id="editActivityYear">
+                        <option value="2">2nd Year</option>
+                        <option value="3">3rd Year</option>
+                        <option value="4">4th Year</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="editActivitySection">Section</label>
+                    <select id="editActivitySection">
+                        <option value="">Select Section</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="D">D</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="editActivityPeriod">Period (1-8)</label>
+                    <input type="number" id="editActivityPeriod" min="1" max="8" placeholder="Period" />
+                </div>
+                <div>
+                    <label for="editActivityHours">Hours</label>
+                    <input type="number" id="editActivityHours" min="1" max="30" placeholder="1" />
+                </div>
+                <div>
+                    <label for="editActivityType">Activity Type</label>
+                    <select id="editActivityType">
+                        <option value="PT">Physical Training (PT)</option>
+                        <option value="Library">Library</option>
+                        <option value="Professional Elective">Professional Elective</option>
+                        <option value="Open Elective">Open Elective</option>
+                        <option value="Mini Project">Mini Project</option>
+                        <option value="Skillrack/Placement">Skillrack/Placement</option>
+                        <option value="Project Phase / Internship">Project Phase / Internship</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="editProfElectiveName">Elective Subject</label>
+                    <input type="text" id="editProfElectiveName" placeholder="Elective Subject" />
+                </div>
+                <div>
+                    <label for="editElectiveSubjectNo">Elective No.</label>
+                    <input type="number" id="editElectiveSubjectNo" placeholder="No." min="1" />
+                </div>
+            </div>
+            <div style="margin-top: 12px;">
+                <label style="display: inline-flex; align-items: center; gap: 6px; font-weight: 500;">
+                    <input type="checkbox" id="editActivityThreePeriod" /> 3-Consecutive Period?
+                </label>
+            </div>
+            <div style="margin-top: 12px; padding: 8px; background-color: #fff3cd; border-radius: 4px;">
+                <label style="display: inline-flex; align-items: center; gap: 6px; font-weight: 500;">
+                    <input type="checkbox" id="editActivityMultipleOccurrences" /> Multiple Times/Week (Mini Project)
+                    <select id="editActivityOccurrenceCount" style="width: 80px; padding: 4px; margin-left: 4px;">
+                        <option value="2">2 times</option>
+                        <option value="3">3 times</option>
+                    </select>
+                </label>
+            </div>
+            <h4 style="margin-top: 16px; margin-bottom: 12px;">Teachers (Up to 10)</h4>
+            <div class="teacher-grid">
+                <select class="teacher-select" id="editMultiTeacher1"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="editMultiTeacher2"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="editMultiTeacher3"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="editMultiTeacher4"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="editMultiTeacher5"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="editMultiTeacher6"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="editMultiTeacher7"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="editMultiTeacher8"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="editMultiTeacher9"><option value="">Select Teacher</option></select>
+                <select class="teacher-select" id="editMultiTeacher10"><option value="">Select Teacher</option></select>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px;">
+                <button onclick="saveEditedActivity()" class="btn-primary">Save Changes</button>
+                <button onclick="closeEditActivityModal()" class="btn-danger">Cancel</button>
+            </div>
+        </div>
     </div>
 
     <!-- Edit Subject Modal -->

@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
-from database import add_teacher, add_subject, get_all_teachers, clear_all, delete_subject, update_subject, save_timetable
+from database import add_teacher, add_subject, get_all_teachers, clear_all, delete_subject, update_subject, save_timetable, delete_teacher, update_teacher
 from scheduler import generate
 from export import export_excel, export_pdf
 import os
@@ -8,7 +8,19 @@ import os
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+EXCEL_FILE = os.path.join(BASE_DIR, "timetable.xlsx")
+PDF_FILE = os.path.join(BASE_DIR, "timetable.pdf")
+
 latest_timetable = None
+
+def remove_existing_export_file(path):
+    if os.path.exists(path):
+        try:
+            os.remove(path)
+            print(f"Removed old export file: {path}")
+        except Exception as e:
+            print(f"Unable to remove old export file {path}: {e}")
 
 @app.route("/")
 def index():
@@ -71,26 +83,26 @@ def create_subject():
 
 @app.route("/api/generate", methods=["POST"])
 def gen_timetable():
-    """Generate timetable for all teachers"""
+    """Generate timetable for all teachers and classes"""
     global latest_timetable
-    
+
     try:
         teachers = get_all_teachers()
-        
+
         if not teachers:
             return jsonify({"error": "No teachers found. Please add teachers and subjects first."}), 400
-        
-        latest_timetable = generate(teachers)
-        save_timetable(latest_timetable)
-        
-        # Format for frontend
-        formatted_timetable = {}
-        for teacher_id, schedule in latest_timetable.items():
-            formatted_timetable[teacher_id] = schedule
-        
+
+        request_data = request.json or {}
+        activities = request_data.get("activities", [])
+
+        latest_timetable = generate(teachers, activities)
+
+        # Save only teacher schedules to timetable_entries for backward compatibility
+        save_timetable(latest_timetable.get('teachers', {}))
+
         return jsonify({
             "success": True,
-            "timetable": formatted_timetable,
+            "timetable": latest_timetable,
             "message": "Timetable generated successfully"
         }), 200
     except Exception as e:
@@ -102,9 +114,18 @@ def download_excel():
     try:
         if latest_timetable is None:
             return jsonify({"error": "No timetable generated yet"}), 400
+
+        teachers_timetable = latest_timetable.get('teachers', {})
+        classes_timetable = latest_timetable.get('classes', {})
         
-        export_excel(latest_timetable)
-        return send_file("timetable.xlsx", as_attachment=True)
+        print(f"DEBUG: Downloading Excel with {len(teachers_timetable)} teachers and {len(classes_timetable)} classes")
+        print(f"DEBUG: Teacher keys = {list(teachers_timetable.keys())}")
+        print(f"DEBUG: Class keys = {list(classes_timetable.keys())}")
+        
+        remove_existing_export_file(EXCEL_FILE)
+        export_excel(teachers_timetable, classes_timetable, output_path=EXCEL_FILE)
+    
+        return send_file(EXCEL_FILE, as_attachment=True)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -114,11 +135,44 @@ def download_pdf():
     try:
         if latest_timetable is None:
             return jsonify({"error": "No timetable generated yet"}), 400
+
+        teachers_timetable = latest_timetable.get('teachers', {})
+        classes_timetable = latest_timetable.get('classes', {})
         
-        export_pdf(latest_timetable)
-        return send_file("timetable.pdf", as_attachment=True)
+        print(f"DEBUG: Downloading PDF with {len(teachers_timetable)} teachers and {len(classes_timetable)} classes")
+        print(f"DEBUG: Teacher keys = {list(teachers_timetable.keys())}")
+        print(f"DEBUG: Class keys = {list(classes_timetable.keys())}")
+        
+        remove_existing_export_file(PDF_FILE)
+        export_pdf(teachers_timetable, classes_timetable, output_path=PDF_FILE)
+        return send_file(PDF_FILE, as_attachment=True)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/api/teachers/<string:teacher_id>", methods=["DELETE"])
+def remove_teacher(teacher_id):
+    """Delete a specific teacher and their subjects"""
+    try:
+        delete_teacher(teacher_id)
+        return jsonify({"message": "Teacher deleted successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/teachers/<string:teacher_id>", methods=["PUT"])
+def edit_teacher(teacher_id):
+    """Update a teacher name"""
+    try:
+        data = request.json
+        name = data.get("name")
+        if not name:
+            return jsonify({"error": "Teacher name is required"}), 400
+
+        update_teacher(teacher_id, name)
+        return jsonify({"message": "Teacher updated successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/subjects/<int:subject_id>", methods=["DELETE"])
 def remove_subject(subject_id):
