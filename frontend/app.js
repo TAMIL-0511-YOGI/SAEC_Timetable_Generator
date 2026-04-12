@@ -824,7 +824,7 @@ async function generateTimetable() {
             showMessage(messageDiv, data.message, "success");
             displayTimetable(data.timetable);
             renderActivities();
-            document.getElementById("timetableSection").style.display = "block";
+            document.getElementById("viewTimetableButtonSection").style.display = "block";
         } else {
             showMessage(messageDiv, data.error || "Error generating timetable", "error");
         }
@@ -869,9 +869,12 @@ function buildTimetableSection(title, scheduleData, labelMapper = (key) => key) 
     }).join('');
 }
 
-async function displayTimetable(timetable) {
-    const container = document.getElementById("timetableContainer");
+// Global variable to store timetable data for toggling between views
+let currentTimetableData = null;
+let currentTeacherNameMap = null;
+let currentTimetableView = 'teacher';
 
+async function displayTimetable(timetable) {
     const teacherResponse = await fetch(`${API_BASE}/teachers`);
     const teacherList = await teacherResponse.json();
     const teacherNameMap = new Map(teacherList.map(t => [t.teacher_id, t.name]));
@@ -879,13 +882,48 @@ async function displayTimetable(timetable) {
     const teacherSchedules = timetable.teachers || timetable;
     const classSchedules = timetable.classes || {};
 
+    // Store globally for toggling between views
+    currentTimetableData = {
+        teachers: teacherSchedules,
+        classes: classSchedules
+    };
+    currentTeacherNameMap = teacherNameMap;
+
+    // Show the default view depending on the current state
+    if (currentTimetableView === 'student') {
+        showStudentsTimetables();
+    } else {
+        showTeachersTimetables();
+    }
+}
+
+// ======================
+// GENERATED TIMETABLE PAGE FUNCTIONS
+// ======================
+function openGeneratedTimetablePage() {
+    document.getElementById("mainContent").style.display = "none";
+    document.getElementById("generatedTimetableSection").style.display = "block";
+    showTeachersTimetables();
+    const generatedSection = document.getElementById("generatedTimetableSection");
+    if (generatedSection) {
+        generatedSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+}
+
+function closeGeneratedTimetablePage() {
+    document.getElementById("generatedTimetableSection").style.display = "none";
+    document.getElementById("mainContent").style.display = "block";
+}
+
+function showTeachersTimetables() {
+    if (!currentTimetableData) return;
+    currentTimetableView = 'teacher';
+    
+    const container = document.getElementById("timetableContainer");
     let html = "";
 
     html += `<section class="section"><h2>Consolidated Teacher Timetables</h2></section>`;
-    html += buildTimetableSection("Teacher", teacherSchedules, key => teacherNameMap.get(key) || key);
-
-    html += `<section class="section"><h2>Student Class Timetables</h2></section>`;
-    html += buildTimetableSection("Class", classSchedules);
+    html += buildTimetableSection("Teacher", currentTimetableData.teachers, key => currentTeacherNameMap.get(key) || key);
 
     if (activities && activities.length > 0) {
         html += `<section class="section"><h2>Institutional Activities</h2><div class="activity-list">`;
@@ -894,9 +932,42 @@ async function displayTimetable(timetable) {
     }
 
     container.innerHTML = html;
+
+    // Update active button state
+    const teacherBtn = document.getElementById("teacherTimetableBtn");
+    const studentBtn = document.getElementById("studentTimetableBtn");
+    teacherBtn.classList.add("active");
+    studentBtn.classList.remove("active");
 }
 
+function showStudentsTimetables() {
+    if (!currentTimetableData) return;
+    currentTimetableView = 'student';
+    
+    const container = document.getElementById("timetableContainer");
+    let html = "";
 
+    html += `<section class="section"><h2>Student Class Timetables</h2></section>`;
+    html += buildTimetableSection("Class", currentTimetableData.classes);
+
+    if (activities && activities.length > 0) {
+        html += `<section class="section"><h2>Institutional Activities</h2><div class="activity-list">`;
+        html += activities.map(a => `<div class="activity-item"><span>${a.type} - ${a.day} P${a.period} ${a.elective ? '- ' + a.elective : ''} ${a.teachers.length ? '- Instructors:' + a.teachers.join(', ') : ''}</span></div>`).join('');
+        html += `</div></section>`;
+    }
+
+    container.innerHTML = html;
+
+    // Update active button state
+    const teacherBtn = document.getElementById("teacherTimetableBtn");
+    const studentBtn = document.getElementById("studentTimetableBtn");
+    teacherBtn.classList.remove("active");
+    studentBtn.classList.add("active");
+}
+
+// ======================
+// GENERATE PERIOD CELLS
+// ======================
 function generatePeriodCells(schedule, day) {
     let html = "";
     const daySchedule = schedule[day];
@@ -951,16 +1022,17 @@ function getSlotContent(slot) {
 // ======================
 async function downloadExcel() {
     const messageDiv = document.getElementById("downloadMessage");
+    const view = currentTimetableView === 'student' ? 'student' : 'teacher';
     
     try {
-        const response = await fetch(`${API_BASE}/download/excel`);
+        const response = await fetch(`${API_BASE}/download/excel?view_type=${view}`);
         
         if (response.ok) {
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "timetable.xlsx";
+            a.download = `timetable-${view}.xlsx`;
             a.click();
             window.URL.revokeObjectURL(url);
             showMessage(messageDiv, "Excel file downloaded successfully!", "success");
@@ -975,16 +1047,17 @@ async function downloadExcel() {
 
 async function downloadPDF() {
     const messageDiv = document.getElementById("downloadMessage");
+    const view = currentTimetableView === 'student' ? 'student' : 'teacher';
     
     try {
-        const response = await fetch(`${API_BASE}/download/pdf`);
+        const response = await fetch(`${API_BASE}/download/pdf?view_type=${view}`);
         
         if (response.ok) {
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "timetable.pdf";
+            a.download = `timetable-${view}.pdf`;
             a.click();
             window.URL.revokeObjectURL(url);
             showMessage(messageDiv, "PDF file downloaded successfully!", "success");
@@ -1018,7 +1091,10 @@ async function clearAllData() {
             document.getElementById("subjectMessage").textContent = "";
             document.getElementById("generateMessage").textContent = "";
             document.getElementById("downloadMessage").textContent = "";
-            document.getElementById("timetableSection").style.display = "none";
+            document.getElementById("viewTimetableButtonSection").style.display = "none";
+            document.getElementById("generatedTimetableSection").style.display = "none";
+            currentTimetableData = null;
+            currentTeacherNameMap = null;
             loadTeachers();
             alert("All data has been cleared successfully!");
         } else {

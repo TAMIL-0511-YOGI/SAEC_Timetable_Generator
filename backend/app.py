@@ -115,16 +115,26 @@ def download_excel():
         if latest_timetable is None:
             return jsonify({"error": "No timetable generated yet"}), 400
 
-        teachers_timetable = latest_timetable.get('teachers', {})
-        classes_timetable = latest_timetable.get('classes', {})
-        
-        print(f"DEBUG: Downloading Excel with {len(teachers_timetable)} teachers and {len(classes_timetable)} classes")
+        view_type = request.args.get('view_type', 'teacher')
+        teachers_timetable = {}
+        classes_timetable = {}
+
+        if view_type == 'student':
+            classes_timetable = latest_timetable.get('classes', {})
+            if not classes_timetable:
+                return jsonify({"error": "No student timetable data available"}), 400
+        else:
+            teachers_timetable = latest_timetable.get('teachers', {})
+            if not teachers_timetable:
+                return jsonify({"error": "No teacher timetable data available"}), 400
+
+        print(f"DEBUG: Downloading Excel for view_type={view_type}")
         print(f"DEBUG: Teacher keys = {list(teachers_timetable.keys())}")
         print(f"DEBUG: Class keys = {list(classes_timetable.keys())}")
         
         remove_existing_export_file(EXCEL_FILE)
         export_excel(teachers_timetable, classes_timetable, output_path=EXCEL_FILE)
-    
+
         return send_file(EXCEL_FILE, as_attachment=True)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -136,10 +146,20 @@ def download_pdf():
         if latest_timetable is None:
             return jsonify({"error": "No timetable generated yet"}), 400
 
-        teachers_timetable = latest_timetable.get('teachers', {})
-        classes_timetable = latest_timetable.get('classes', {})
+        view_type = request.args.get('view_type', 'teacher')
+        teachers_timetable = {}
+        classes_timetable = {}
+
+        if view_type == 'student':
+            classes_timetable = latest_timetable.get('classes', {})
+            if not classes_timetable:
+                return jsonify({"error": "No student timetable data available"}), 400
+        else:
+            teachers_timetable = latest_timetable.get('teachers', {})
+            if not teachers_timetable:
+                return jsonify({"error": "No teacher timetable data available"}), 400
         
-        print(f"DEBUG: Downloading PDF with {len(teachers_timetable)} teachers and {len(classes_timetable)} classes")
+        print(f"DEBUG: Downloading PDF for view_type={view_type}")
         print(f"DEBUG: Teacher keys = {list(teachers_timetable.keys())}")
         print(f"DEBUG: Class keys = {list(classes_timetable.keys())}")
         

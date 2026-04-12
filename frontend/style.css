@@ -749,6 +749,191 @@ td.class {
     font-weight: 600;
 }
 
+/* Interactive View Timetable Button */
+.btn-view-timetable {
+    background: linear-gradient(135deg, #8B6F47 0%, #A0826D 50%, #8B6F47 100%);
+    color: white;
+    border: none;
+    padding: 16px 40px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border-radius: 12px;
+    cursor: pointer;
+    width: 100%;
+    max-width: 600px;
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.320, 1);
+    box-shadow: 0 8px 20px rgba(139, 111, 71, 0.3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+    letter-spacing: 0.5px;
+}
+
+.btn-view-timetable::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn-view-timetable:hover::before {
+    left: 100%;
+}
+
+.btn-view-timetable:hover {
+    background: linear-gradient(135deg, #9B7F57 0%, #B0926D 50%, #9B7F57 100%);
+    box-shadow: 0 12px 28px rgba(139, 111, 71, 0.4), 0 0 20px rgba(139, 111, 71, 0.2);
+    transform: translateY(-3px);
+}
+
+.btn-view-timetable:active {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(139, 111, 71, 0.3);
+}
+
+.timetable-icon {
+    font-size: 1.4rem;
+    animation: bounce-icon 2s ease-in-out infinite;
+}
+
+.arrow-icon {
+    font-size: 1.2rem;
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.btn-view-timetable:hover .arrow-icon {
+    transform: translateX(4px);
+}
+
+@keyframes bounce-icon {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-4px);
+    }
+}
+
+/* Timetable Type Selector Buttons */
+.generated-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.timetable-selector-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 24px;
+    flex: 1 1 400px;
+    padding: 30px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.export-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-end;
+    flex: 0 0 240px;
+}
+
+.btn-selector,
+.btn-export {
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    padding: 12px 26px;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    min-width: 180px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.btn-selector {
+    background-color: #f8f5f0;
+    color: #3b2d17;
+    border-color: #e8dfd5;
+    box-shadow: 0 4px 15px rgba(102, 81, 57, 0.15);
+    padding: 20px 32px;
+    min-width: 200px;
+    border-radius: 12px;
+    font-size: 1.05rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.icon-left {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+
+.btn-selector.active,
+.btn-selector.selected {
+    background: linear-gradient(135deg, #8B6F47 0%, #9f8261 100%);
+    color: #ffffff;
+    border-color: #8B6F47;
+    box-shadow: 0 10px 28px rgba(139, 111, 71, 0.35);
+    transform: scale(1.02);
+}
+
+.btn-selector:hover {
+    transform: translateY(-3px) scale(1.01);
+    background-color: #e8dfd5;
+    color: #3b2d17;
+    border-color: #d4c8b8;
+    box-shadow: 0 8px 22px rgba(102, 81, 57, 0.2);
+}
+
+.btn-export {
+    background-color: #d8c7f5;
+    color: #3f2c6f;
+    border-color: #c1aef0;
+    box-shadow: 0 5px 16px rgba(114, 89, 174, 0.18);
+}
+
+.btn-export:hover {
+    transform: translateY(-2px);
+    background-color: #cdb1f8;
+}
+
+.download-message {
+    margin-top: 10px;
+}
+
+@media (max-width: 900px) {
+    .generated-controls {
+        justify-content: center;
+        align-items: center;
+    }
+
+    .export-controls {
+        align-items: center;
+        flex: 1 1 100%;
+    }
+}
+
 @media (max-width: 768px) {
     header h1 {
         font-size: 1.8em;

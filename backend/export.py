@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+from openpyxl.styles import Border, Side, Font, Alignment, PatternFill
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
@@ -28,8 +29,10 @@ def export_excel(teacher_timetable, class_timetable=None, output_path="timetable
         print(f"Teachers in database: {list(teacher_lookup.keys())}")
         
         with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
-            # Export Teacher Timetables
+            # Export All Teacher Timetables in One Sheet
             exported_teachers = 0
+            combined_data = []
+            
             for teacher_id in sorted(teacher_timetable.keys()):
                 teacher_info = teacher_lookup.get(teacher_id)
                 teacher_name = teacher_info.name if teacher_info else f"Teacher_{teacher_id}"
@@ -37,10 +40,12 @@ def export_excel(teacher_timetable, class_timetable=None, output_path="timetable
                 try:
                     schedule = teacher_timetable[teacher_id]
                     
-                    # Build data for this teacher
-                    data = []
-                    header = ["Day"] + [f"Period {i+1}" for i in range(PERIODS)]
-                    data.append(header)
+                    # Add teacher name as a separator row
+                    combined_data.append([f"TEACHER: {teacher_name.upper()}"] + [""] * PERIODS)
+                    
+                    # Build header
+                    header = ["Day"] + [f"P{i+1}" for i in range(PERIODS)]
+                    combined_data.append(header)
                     
                     for day in DAYS:
                         row = [day]
@@ -56,37 +61,105 @@ def export_excel(teacher_timetable, class_timetable=None, output_path="timetable
                                 class_name = slot.get("class", "")
                                 entry_type = slot.get("type", "Class")
                                 if entry_type == "Lab":
-                                    row.append(f"{subject}\n({class_name})\n[LAB]")
+                                    row.append(f"{subject} ({class_name}) [LAB]")
                                 else:
-                                    row.append(f"{subject}\n({class_name})")
+                                    row.append(f"{subject} ({class_name})")
                         
-                        data.append(row)
+                        combined_data.append(row)
                     
-                    # Create sheet name (ensure uniqueness)
-                    sheet_name = f"T-{teacher_name[:12]}"
+                    # Add blank row separator between teachers
+                    combined_data.append([""] * (PERIODS + 1))
                     
-                    # Write to Excel
-                    df = pd.DataFrame(data[1:], columns=data[0])
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
-                    
-                    print(f"Exported teacher {teacher_id}: {teacher_name} to sheet '{sheet_name}'")
+                    print(f"Added teacher {teacher_id}: {teacher_name}")
                     exported_teachers += 1
                     
                 except Exception as e:
                     print(f"Error exporting teacher {teacher_id} ({teacher_name}): {str(e)}")
                     raise
             
-            # Export Student/Class Timetables
+            # Write all teachers to a single sheet
+            if combined_data:
+                df = pd.DataFrame(combined_data)
+                df.to_excel(writer, sheet_name="Teachers Timetable", index=False, header=False)
+                
+                # Apply styling using openpyxl
+                ws = writer.sheets["Teachers Timetable"]
+                thin_border = Border(
+                    left=Side(style='thin', color='000000'),
+                    right=Side(style='thin', color='000000'),
+                    top=Side(style='thin', color='000000'),
+                    bottom=Side(style='thin', color='000000')
+                )
+                
+                row_num = 1
+                teacher_count = 0
+                
+                for idx, row in enumerate(combined_data):
+                    current_row = row_num
+                    
+                    # Teacher name row
+                    if row[0].startswith("TEACHER:"):
+                        teacher_count += 1
+                        for col_num, value in enumerate(row, 1):
+                            cell = ws.cell(row=current_row, column=col_num)
+                            cell.value = value
+                            cell.border = thin_border
+                            cell.font = Font(bold=True, size=13, color="000000")
+                            cell.alignment = Alignment(horizontal='center', vertical='center')
+                            ws.column_dimensions[cell.column_letter].width = 14
+                        row_num += 1
+                    
+                    # Header row (Day, P1, P2, ...)
+                    elif row[0] == "Day":
+                        for col_num, value in enumerate(row, 1):
+                            cell = ws.cell(row=current_row, column=col_num)
+                            cell.value = value
+                            cell.border = thin_border
+                            cell.font = Font(bold=True, size=11, color="FFFFFF")
+                            cell.fill = PatternFill(start_color="003366", end_color="003366", fill_type="solid")
+                            cell.alignment = Alignment(horizontal='center', vertical='center')
+                            if col_num == 1:
+                                ws.column_dimensions[cell.column_letter].width = 12
+                            else:
+                                ws.column_dimensions[cell.column_letter].width = 14
+                        row_num += 1
+                    
+                    # Day data rows
+                    elif row[0] in DAYS:
+                        for col_num, value in enumerate(row, 1):
+                            cell = ws.cell(row=current_row, column=col_num)
+                            cell.value = value
+                            cell.border = thin_border
+                            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                            if col_num == 1:
+                                cell.font = Font(bold=True, size=10)
+                                ws.column_dimensions[cell.column_letter].width = 12
+                            else:
+                                ws.column_dimensions[cell.column_letter].width = 14
+                        ws.row_dimensions[current_row].height = 30
+                        row_num += 1
+                    
+                    # Blank separator rows
+                    else:
+                        row_num += 1
+                
+                print(f"All {exported_teachers} teachers exported to 'Teachers Timetable' sheet with formatting")
+            
+            # Export Student/Class Timetables - All in One Sheet
             if class_timetable and len(class_timetable) > 0:
                 exported_classes = 0
+                combined_class_data = []
+                
                 for class_name in sorted(class_timetable.keys()):
                     try:
                         schedule = class_timetable[class_name]
                         
-                        # Build data for this class
-                        data = []
-                        header = ["Day"] + [f"Period {i+1}" for i in range(PERIODS)]
-                        data.append(header)
+                        # Add class name as a separator row
+                        combined_class_data.append([f"CLASS: {class_name.upper()}"] + [""] * PERIODS)
+                        
+                        # Build header
+                        header = ["Day"] + [f"P{i+1}" for i in range(PERIODS)]
+                        combined_class_data.append(header)
                         
                         for day in DAYS:
                             row = [day]
@@ -101,29 +174,89 @@ def export_excel(teacher_timetable, class_timetable=None, output_path="timetable
                                     subject = slot.get("subject", "")
                                     entry_type = slot.get("type", "Class")
                                     if entry_type == "Lab":
-                                        row.append(f"{subject}\n[LAB]")
+                                        row.append(f"{subject} [LAB]")
                                     elif entry_type == "Activity":
-                                        row.append(f"{subject}\n[Activity]")
+                                        row.append(f"{subject} [Activity]")
                                     else:
                                         row.append(subject)
                             
-                            data.append(row)
+                            combined_class_data.append(row)
                         
-                        # Create sheet name
-                        sheet_name = f"C-{class_name}"
+                        # Add blank row separator between classes
+                        combined_class_data.append([""] * (PERIODS + 1))
                         
-                        # Write to Excel
-                        df = pd.DataFrame(data[1:], columns=data[0])
-                        df.to_excel(writer, sheet_name=sheet_name, index=False)
-                        
-                        print(f"Exported class {class_name} to sheet 'C-{class_name}'")
+                        print(f"Added class {class_name}")
                         exported_classes += 1
                         
                     except Exception as e:
                         print(f"Error exporting class {class_name}: {str(e)}")
                         raise
                 
-                print(f"\nTotal classes exported: {exported_classes}")
+                # Write all classes to a single sheet with formatting
+                if combined_class_data:
+                    df = pd.DataFrame(combined_class_data)
+                    df.to_excel(writer, sheet_name="Students Timetable", index=False, header=False)
+                    
+                    # Apply styling using openpyxl
+                    ws_class = writer.sheets["Students Timetable"]
+                    thin_border = Border(
+                        left=Side(style='thin', color='000000'),
+                        right=Side(style='thin', color='000000'),
+                        top=Side(style='thin', color='000000'),
+                        bottom=Side(style='thin', color='000000')
+                    )
+                    
+                    row_num = 1
+                    
+                    for idx, row in enumerate(combined_class_data):
+                        current_row = row_num
+                        
+                        # Class name row
+                        if row[0].startswith("CLASS:"):
+                            for col_num, value in enumerate(row, 1):
+                                cell = ws_class.cell(row=current_row, column=col_num)
+                                cell.value = value
+                                cell.border = thin_border
+                                cell.font = Font(bold=True, size=13, color="000000")
+                                cell.alignment = Alignment(horizontal='center', vertical='center')
+                                ws_class.column_dimensions[cell.column_letter].width = 14
+                            row_num += 1
+                        
+                        # Header row (Day, P1, P2, ...)
+                        elif row[0] == "Day":
+                            for col_num, value in enumerate(row, 1):
+                                cell = ws_class.cell(row=current_row, column=col_num)
+                                cell.value = value
+                                cell.border = thin_border
+                                cell.font = Font(bold=True, size=11, color="FFFFFF")
+                                cell.fill = PatternFill(start_color="003366", end_color="003366", fill_type="solid")
+                                cell.alignment = Alignment(horizontal='center', vertical='center')
+                                if col_num == 1:
+                                    ws_class.column_dimensions[cell.column_letter].width = 12
+                                else:
+                                    ws_class.column_dimensions[cell.column_letter].width = 14
+                            row_num += 1
+                        
+                        # Day data rows
+                        elif row[0] in DAYS:
+                            for col_num, value in enumerate(row, 1):
+                                cell = ws_class.cell(row=current_row, column=col_num)
+                                cell.value = value
+                                cell.border = thin_border
+                                cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                                if col_num == 1:
+                                    cell.font = Font(bold=True, size=10)
+                                    ws_class.column_dimensions[cell.column_letter].width = 12
+                                else:
+                                    ws_class.column_dimensions[cell.column_letter].width = 14
+                            ws_class.row_dimensions[current_row].height = 30
+                            row_num += 1
+                        
+                        # Blank separator rows
+                        else:
+                            row_num += 1
+                    
+                    print(f"All {exported_classes} classes exported to 'Students Timetable' sheet with formatting")
         
         print(f"Total teachers exported: {exported_teachers}")
         print(f"Excel file saved: {output_path}")
@@ -199,7 +332,9 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
         story.append(Paragraph("TEACHER TIMETABLES", section_style))
         
         exported_teachers = 0
-        for teacher_id in sorted(teacher_timetable.keys()):
+        teacher_ids = sorted(teacher_timetable.keys())
+        
+        for idx, teacher_id in enumerate(teacher_ids):
             teacher_info = teacher_lookup.get(teacher_id)
             if not teacher_info:
                 print(f"Warning: Teacher {teacher_id} not found in database - skipping")
@@ -210,9 +345,13 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
             try:
                 schedule = teacher_timetable[teacher_id]
                 
-                # Teacher info
-                teacher_info_text = f"<b>Teacher:</b> {teacher.name} | <b>Subjects:</b> {', '.join(s.name for s in teacher.subjects)}"
-                story.append(Paragraph(teacher_info_text, teacher_style))
+                # Teacher name - bold and prominent
+                teacher_name_text = f"<b><font size=12>{teacher.name}</font></b>"
+                story.append(Paragraph(teacher_name_text, teacher_style))
+                
+                # Subjects list
+                subjects_text = f"<i>Subjects: {', '.join(s.name for s in teacher.subjects)}</i>"
+                story.append(Paragraph(subjects_text, class_style))
                 
                 # Build table data
                 table_data = []
@@ -239,8 +378,9 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                     
                     table_data.append(row)
                 
-                # Create and style table
-                table = Table(table_data, colWidths=[0.8*inch] + [0.7*inch]*PERIODS)
+                # Create and style table with equal column widths
+                col_widths = [0.9*inch] + [0.75*inch]*PERIODS
+                table = Table(table_data, colWidths=col_widths)
                 table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#003366')),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -249,15 +389,32 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, 0), 10),
                     ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('TOPPADDING', (0, 0), (-1, 0), 8),
                     ('BACKGROUND', (0, 1), (0, -1), colors.HexColor('#e6f0ff')),
                     ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('FONTSIZE', (0, 1), (-1, -1), 8),
+                    ('FONTSIZE', (0, 1), (-1, -1), 9),
                     ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f5ff')]),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                    ('TOPPADDING', (0, 1), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
                 ]))
                 
                 story.append(table)
-                story.append(Spacer(1, 0.5 * inch))
-                story.append(PageBreak())
+                story.append(Spacer(1, 0.4 * inch))
+                
+                # Add page break after every 2 teachers
+                if (idx + 1) % 2 == 0 and idx != len(teacher_ids) - 1:
+                    story.append(PageBreak())
+                    story.append(Paragraph("TEACHER TIMETABLES", section_style))
+                
+                print(f"Exported teacher {teacher_id}: {teacher.name}")
+                exported_teachers += 1
+                
+            except Exception as e:
+                print(f"Error exporting teacher {teacher_id}: {str(e)}")
+                raise
+
                 
                 print(f"Exported teacher {teacher_id}: {teacher.name}")
                 exported_teachers += 1
@@ -271,7 +428,8 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
             story.append(Paragraph("STUDENT/CLASS TIMETABLES", section_style))
             
             exported_classes = 0
-            for class_name in sorted(class_timetable.keys()):
+            class_names = sorted(class_timetable.keys())
+            for idx, class_name in enumerate(class_names):
                 try:
                     schedule = class_timetable[class_name]
                     
@@ -323,6 +481,11 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                     
                     story.append(table)
                     story.append(Spacer(1, 0.4 * inch))
+                    
+                    # Force two classes per PDF page
+                    if (idx + 1) % 2 == 0 and idx != len(class_names) - 1:
+                        story.append(PageBreak())
+                        story.append(Paragraph("STUDENT/CLASS TIMETABLES", section_style))
                     
                     print(f"Exported class {class_name}")
                     exported_classes += 1
