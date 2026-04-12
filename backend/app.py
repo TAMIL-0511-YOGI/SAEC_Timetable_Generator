@@ -6,7 +6,13 @@ from export import export_excel, export_pdf
 import os
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
-CORS(app, origins=["https://faculty-timetable-web-udml.vercel.app"])
+CORS(app, resources={r"/api/*": {"origins": [
+    "https://faculty-timetable-web-udml.vercel.app",
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500"
+]}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EXCEL_FILE = os.path.join(BASE_DIR, "timetable.xlsx")
