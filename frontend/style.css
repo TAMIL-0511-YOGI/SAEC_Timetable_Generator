@@ -1069,10 +1069,25 @@ td.class {
 
     .teacher-card {
         padding: 14px;
+        width: 100%;
     }
 
     .teacher-card h3 {
         font-size: 1.05rem;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .teacher-card p,
+    .subject-item,
+    .teacher-card h3,
+    .activity-item span,
+    .activity-list,
+    label,
+    input,
+    select,
+    button {
+        font-size: 0.95rem;
     }
 
     .subject-item {
