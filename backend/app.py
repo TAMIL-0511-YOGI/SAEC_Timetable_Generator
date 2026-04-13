@@ -6,13 +6,9 @@ from export import export_excel, export_pdf
 import os
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
-CORS(app, resources={r"/api/*": {"origins": [
-    "https://faculty-timetable-web-udml.vercel.app",
-    "http://localhost:5000",
-    "http://127.0.0.1:5000",
-    "http://localhost:5500",
-    "http://127.0.0.1:5500"
-]}})
+# Allow cross-origin access for the deployed frontend and preview domains.
+# If your frontend and backend are served from the same origin, you can keep this as a broad setting.
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EXCEL_FILE = os.path.join(BASE_DIR, "timetable.xlsx")

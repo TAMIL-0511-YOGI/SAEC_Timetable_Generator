@@ -1,4 +1,12 @@
-const API_BASE = "http://localhost:5000/api";
+// Use environment variable if available, otherwise fallback to localhost during development,
+// or to the current origin when deployed alongside the backend.
+const API_BASE =
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL)
+    ? process.env.NEXT_PUBLIC_API_URL + "/api"
+    : (typeof window !== "undefined" && window.location.hostname &&
+       window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1")
+    ? "/api"
+    : "http://localhost:5000/api";
 
 // Period timings (50 mins each)
 const PERIOD_TIMINGS = {
