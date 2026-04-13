@@ -262,6 +262,21 @@ input, select {
     min-width: 200px;
 }
 
+.icon-btn {
+    padding: 8px;
+    min-width: 36px;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+}
+
+.icon-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
 input:focus, select:focus {
     outline: none;
     border-color: #28a745;
@@ -942,6 +957,16 @@ td.class {
         font-size: 1.8em;
     }
 
+    .container {
+        margin: 16px;
+        background-color: rgba(255, 255, 255, 0.85);
+    }
+
+    .section {
+        padding: 18px;
+        background-color: rgba(255, 255, 255, 0.92);
+    }
+
     .college-topbar {
         flex-wrap: wrap;
         justify-content: center;
@@ -951,10 +976,6 @@ td.class {
     .college-title {
         width: 100%;
         min-width: 0;
-    }
-
-    .section {
-        padding: 20px;
     }
 
     .section > div {
@@ -973,10 +994,12 @@ td.class {
 
     input, select, button {
         width: 100%;
+        min-width: 0;
     }
 
     .teacher-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+        gap: 10px;
     }
 
     .timetable-selector-wrapper,
@@ -997,5 +1020,16 @@ td.class {
 
     th, td {
         padding: 8px;
+    }
+
+    .icon-btn {
+        padding: 6px;
+        min-width: 34px;
+        min-height: 34px;
+    }
+
+    .icon-btn svg {
+        width: 14px;
+        height: 14px;
     }
 }
