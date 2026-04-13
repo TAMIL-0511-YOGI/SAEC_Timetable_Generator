@@ -954,17 +954,46 @@ td.class {
 
 @media (max-width: 768px) {
     header h1 {
-        font-size: 1.8em;
+        font-size: 1.6em;
+    }
+
+    .college-title h1 {
+        font-size: 1.2rem;
+    }
+
+    .college-title p,
+    .college-subtitle,
+    header p,
+    .section h2,
+    .btn-secondary,
+    .btn-primary,
+    .btn-danger,
+    .btn-view-timetable,
+    .btn-selector,
+    .btn-export,
+    button,
+    input,
+    select,
+    .timetable-title,
+    .teacher-card h3,
+    .subject-item {
+        font-size: 0.95rem;
     }
 
     .container {
-        margin: 16px;
-        background-color: rgba(255, 255, 255, 0.85);
+        margin: 12px;
+        background-color: rgba(255, 255, 255, 0.8);
     }
 
     .section {
-        padding: 18px;
-        background-color: rgba(255, 255, 255, 0.92);
+        padding: 14px;
+        background-color: rgba(255, 255, 255, 0.88);
+        margin-bottom: 16px;
+    }
+
+    .section h2 {
+        font-size: 1.2rem;
+        line-height: 1.2;
     }
 
     .college-topbar {
@@ -979,8 +1008,11 @@ td.class {
     }
 
     .section > div {
+        display: flex;
         flex-wrap: wrap;
-        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
     }
 
     .generated-controls {
@@ -990,16 +1022,19 @@ td.class {
 
     .form-group {
         flex-direction: column;
+        gap: 10px;
     }
 
     input, select, button {
         width: 100%;
         min-width: 0;
+        font-size: 0.95rem;
+        padding: 10px;
     }
 
     .teacher-grid {
         grid-template-columns: repeat(1, minmax(0, 1fr));
-        gap: 10px;
+        gap: 8px;
     }
 
     .timetable-selector-wrapper,
@@ -1011,25 +1046,68 @@ td.class {
     }
 
     .timetable-selector-wrapper {
-        padding: 16px;
+        padding: 14px;
+    }
+
+    .btn-primary,
+    .btn-secondary,
+    .btn-danger {
+        padding: 10px 14px;
+        border-radius: 10px;
+    }
+
+    .btn-view-timetable {
+        padding: 14px 18px;
+        font-size: 1rem;
+    }
+
+    .btn-selector,
+    .btn-export {
+        padding: 12px 16px;
+        min-width: 0;
+    }
+
+    .teacher-card {
+        padding: 14px;
+    }
+
+    .teacher-card h3 {
+        font-size: 1.05rem;
+    }
+
+    .subject-item {
+        font-size: 0.9rem;
+    }
+
+    .timetable-title {
+        font-size: 1rem;
     }
 
     table {
-        font-size: 0.8em;
+        font-size: 0.78em;
     }
 
     th, td {
-        padding: 8px;
+        padding: 6px;
     }
 
     .icon-btn {
-        padding: 6px;
-        min-width: 34px;
-        min-height: 34px;
+        padding: 5px;
+        min-width: 30px;
+        min-height: 30px;
     }
 
     .icon-btn svg {
-        width: 14px;
-        height: 14px;
+        width: 12px;
+        height: 12px;
+    }
+
+    .section > div > button {
+        flex: 1 1 auto;
+        min-width: 140px;
+    }
+
+    .section > div > h2 {
+        max-width: calc(100% - 150px);
     }
 }
