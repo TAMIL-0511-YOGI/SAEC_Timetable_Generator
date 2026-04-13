@@ -500,16 +500,19 @@ button:active {
 .timetable-container {
     margin-top: 20px;
     overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+	overflow-y: hidden;
 }
 
 .teacher-timetable {
     margin-bottom: 30px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .timetable {
     width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 20px;
+    min-width: 1000px;
     font-size: 0.85em;
 }
 
@@ -939,12 +942,53 @@ td.class {
         font-size: 1.8em;
     }
 
+    .college-topbar {
+        flex-wrap: wrap;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .college-title {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .section {
+        padding: 20px;
+    }
+
+    .section > div {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .generated-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
     .form-group {
         flex-direction: column;
     }
 
     input, select, button {
         width: 100%;
+    }
+
+    .teacher-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .timetable-selector-wrapper,
+    .export-controls,
+    .btn-selector,
+    .btn-export {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .timetable-selector-wrapper {
+        padding: 16px;
     }
 
     table {
