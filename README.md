@@ -12,6 +12,9 @@ The Faculty AI Timetable Generator is a Python-based web application designed to
 - **Lab Auto Placement**: Intelligent scheduling of laboratory sessions to optimize resource utilization.
 - **Free Period Balancing**: Ensures fair distribution of free periods across faculty members.
 - **Responsive Design**: A user-friendly and interactive UI that works seamlessly across devices.
+- **Automatic Retry Logic**: Robust API resilience with automatic retry mechanism (3 attempts with 2-second delays) for handling transient backend failures.
+- **Loading Indicators**: User-friendly loading spinner during page initialization and API calls with clear status messages.
+- **Error Recovery**: Smart error handling with user-visible error messages, manual retry buttons, and graceful degradation when backend is unavailable.
 
 ## Technologies Used
 - **Backend**: Flask (Python)

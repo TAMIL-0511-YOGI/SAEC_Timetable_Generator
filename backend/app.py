@@ -10,6 +10,21 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 # If your frontend and backend are served from the same origin, you can keep this as a broad setting.
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+# Add Security and SEO Headers
+@app.after_request
+def add_security_headers(response):
+    # Security Headers
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self' https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:;"
+    
+    # SEO Headers
+    response.headers['X-UA-Compatible'] = 'IE=edge'
+    
+    return response
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EXCEL_FILE = os.path.join(BASE_DIR, "timetable.xlsx")
 PDF_FILE = os.path.join(BASE_DIR, "timetable.pdf")
@@ -28,6 +43,16 @@ def remove_existing_export_file(path):
 def index():
     """Serve the main index.html"""
     return send_from_directory('../frontend', 'index.html')
+
+@app.route("/robots.txt")
+def robots():
+    """Serve robots.txt for search engine crawlers"""
+    return send_from_directory('../frontend', 'robots.txt')
+
+@app.route("/sitemap.xml")
+def sitemap():
+    """Serve sitemap.xml for search engine indexing"""
+    return send_from_directory('../frontend', 'sitemap.xml')
 
 @app.route("/<path:filename>")
 def static_files(filename):

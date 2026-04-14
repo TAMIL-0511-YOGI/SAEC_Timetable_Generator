@@ -1212,7 +1212,20 @@ async function downloadPDF() {
 // CLEAR DATA
 // ======================
 async function clearAllData() {
+    // First confirmation
     if (!confirm("Are you sure you want to clear all data? This cannot be undone.")) {
+        return;
+    }
+
+    // Second confirmation for extra safety
+    if (!confirm("⚠️ WARNING: This will permanently delete all teacher, subject, and timetable data. Click OK only if you are absolutely certain you want to proceed.")) {
+        return;
+    }
+
+    // Third confirmation - require typing "CLEAR"
+    const confirmText = prompt("Type 'CLEAR' (in capitals) to confirm permanent data deletion:");
+    if (confirmText !== "CLEAR") {
+        alert("Data clearing cancelled. You did not type 'CLEAR' correctly.");
         return;
     }
 
@@ -1234,7 +1247,7 @@ async function clearAllData() {
             currentTimetableData = null;
             currentTeacherNameMap = null;
             loadTeachers();
-            alert("All data has been cleared successfully!");
+            alert("✓ All data has been cleared successfully! The system has been reset to its initial state.");
         } else {
             alert(data.error || "Error clearing data");
         }

@@ -1,0 +1,36 @@
+# Enable GZIP compression
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript
+</IfModule>
+
+# Set expiration times
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/html "access plus 1 day"
+  ExpiresByType text/css "access plus 1 week"
+  ExpiresByType application/javascript "access plus 1 week"
+  ExpiresByType image/jpg "access plus 1 month"
+  ExpiresByType image/png "access plus 1 month"
+  ExpiresByType image/gif "access plus 1 month"
+</IfModule>
+
+# Add cache control headers
+<filesMatch "\.(jpg|jpeg|png|gif|css|js|ico|svg)$">
+  Header set Cache-Control "max-age=604800, public"
+</filesMatch>
+
+# Security headers
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set X-XSS-Protection "1; mode=block"
+  Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
+
+# Rewrite rules for SEO-friendly URLs
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^(.*)$ index.html [QSA,L]
+</IfModule>

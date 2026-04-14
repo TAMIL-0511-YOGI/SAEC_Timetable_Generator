@@ -1,0 +1,31 @@
+# Robots.txt for SAEC Timetable Generator
+# Allow search engines to crawl and index the website
+
+User-agent: *
+Allow: /
+Allow: /index.html
+Allow: /app.js
+Allow: /style.css
+
+# Disallow private/admin areas if any
+Disallow: /private/
+Disallow: /admin/
+
+# Sitemap location
+Sitemap: https://saec-timetable-generator.vercel.app/sitemap.xml
+
+# Crawl delay to prevent server overload
+Crawl-delay: 1
+
+# Allow specific search engine bots
+User-agent: Googlebot
+Allow: /
+Priority: 0.8
+
+User-agent: Bingbot
+Allow: /
+Priority: 0.8
+
+User-agent: Slurp
+Allow: /
+Priority: 0.8

@@ -81,6 +81,8 @@ Intelligent lab period placement optimizing resource utilization
 Fair distribution of free periods ensuring teacher work-life balance
 Real-time timetable validation and regeneration
 Multi-format export (PDF, Excel) for stakeholder communication
+Robust API resilience with automatic retry mechanism for backend failures
+User-friendly loading indicators and error feedback on connection issues
 
 The system has been tested across multiple scenarios with varying numbers of teachers, subjects, and constraints, demonstrating robust performance and scalability. This documentation provides comprehensive details on system architecture, design decisions, implementation strategies, and testing procedures.
 
@@ -318,7 +320,10 @@ Data integrity checks
 **Reliability Requirements:**
 - System uptime: 99%
 - Data persistence without data loss
-- Graceful error handling
+- Graceful error handling with user feedback
+- Automatic retry mechanism for transient API failures (up to 3 attempts with 2-second delays)
+- Request timeout handling (15-second limit)
+- Loading indicators during initialization
 - Error logging and reporting
 
 **Scalability Requirements:**
@@ -944,11 +949,21 @@ Create diagram showing lab placement logic flow
 - Detailed error messages
 - Logging of validation failures
 
+**API Resilience & Error Handling:**
+- **Automatic Retry Mechanism:** Failed API requests automatically retry up to 3 times with 2-second delays between attempts
+- **Request Timeout:** 15-second timeout on all API calls to prevent indefinite hanging
+- **Loading Indicators:** Visual spinner displayed during page initialization and API calls
+- **Error Feedback:** User-visible error banners showing connection status and suggestions
+- **Form Protection:** Form elements disabled when API connection fails, re-enabled on success
+- **Manual Retry Option:** "Retry Connection" button allows users to manually attempt reconnection
+- **Cold Start Handling:** Optimized for slow Render backend wake-up times on first page load
+
 **Error Handling Strategy:**
-- Try-catch blocks around database operations
-- Graceful degradation
-- User-friendly error messages
+- Try-catch blocks around API calls and database operations
+- Graceful degradation with fallback UI states
+- User-friendly error messages explaining issues and solutions
 - Admin error logs for debugging
+- Detection and recovery from transient network failures
 
 ---
 
