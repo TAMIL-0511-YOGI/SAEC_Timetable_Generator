@@ -2,6 +2,16 @@
 // Use the Render backend URL directly for API calls.
 const API_BASE = "https://saec-timetable-generator.onrender.com/api";
 
+// API retry configuration
+const API_CONFIG = {
+    MAX_RETRIES: 3,
+    RETRY_DELAY: 2000,  // 2 seconds between retries
+    TIMEOUT: 15000      // 15 second timeout for API calls
+};
+
+// Global initialization state
+let initializationFailed = false;
+
 // Period timings (50 mins each)
 const PERIOD_TIMINGS = {
     0: "8:30 - 9:20",
@@ -595,10 +605,28 @@ window.onclick = function(event) {
 // ======================
 // LOAD TEACHERS
 // ======================
-async function loadTeachers() {
+async function loadTeachers(retryCount = 0) {
     try {
-        const response = await fetch(`${API_BASE}/teachers`);
+        // Create AbortController for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
+
+        const response = await fetch(`${API_BASE}/teachers`, {
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw new Error(`API returned status ${response.status}`);
+        }
+
         const teachers = await response.json();
+
+        // Clear any previous initialization errors
+        hideInitializationError();
+        hideLoadingIndicator();
+        initializationFailed = false;
 
         // Update teacher dropdown
         const teacherSelect = document.getElementById("teacherSelect");
@@ -622,7 +650,115 @@ async function loadTeachers() {
         displayTeachers(teachers);
     } catch (error) {
         console.error("Error loading teachers:", error);
+
+        // Retry logic
+        if (retryCount < API_CONFIG.MAX_RETRIES) {
+            const retryAttempt = retryCount + 1;
+            console.log(`Retrying API call (${retryAttempt}/${API_CONFIG.MAX_RETRIES}) in ${API_CONFIG.RETRY_DELAY}ms...`);
+            
+            setTimeout(() => {
+                loadTeachers(retryAttempt);
+            }, API_CONFIG.RETRY_DELAY);
+        } else {
+            // All retries exhausted - show error to user
+            initializationFailed = true;
+            hideLoadingIndicator();
+            showInitializationError(error.message);
+            console.error("Failed to load teachers after all retries", error);
+        }
     }
+}
+
+function showInitializationError(errorMessage) {
+    const errorDiv = document.getElementById("initializationError");
+    if (!errorDiv) {
+        const container = document.getElementById("mainContent") || document.body;
+        const newErrorDiv = document.createElement("div");
+        newErrorDiv.id = "initializationError";
+        newErrorDiv.style.cssText = `
+            background-color: #ffe0e0;
+            border: 2px solid #d32f2f;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px;
+            text-align: center;
+            z-index: 1000;
+        `;
+        newErrorDiv.innerHTML = `
+            <h3 style="color: #d32f2f; margin-top: 0;">⚠️ Connection Error</h3>
+            <p style="color: #333; margin: 10px 0;">Unable to connect to the backend server.</p>
+            <p style="color: #666; font-size: 14px; margin: 10px 0;">Error: ${errorMessage}</p>
+            <p style="color: #666; font-size: 14px; margin: 10px 0;">This might happen if:<br/>• The backend server is starting up (first page load)<br/>• The backend is temporarily unavailable<br/>• There's a network connectivity issue</p>
+            <button onclick="retryInitialization()" style="
+                background-color: #d32f2f;
+                color: white;
+                border: none;
+                padding: 10px 24px;
+                border-radius: 4px;
+                font-size: 16px;
+                cursor: pointer;
+                margin-top: 10px;
+            ">Retry Connection</button>
+        `;
+        container.insertBefore(newErrorDiv, container.firstChild);
+    } else {
+        errorDiv.style.display = "block";
+    }
+
+    // Disable main form if initialization failed
+    disableMainContent();
+}
+
+function hideInitializationError() {
+    const errorDiv = document.getElementById("initializationError");
+    if (errorDiv) {
+        errorDiv.style.display = "none";
+    }
+
+    // Re-enable main form
+    enableMainContent();
+}
+
+function retryInitialization() {
+    console.log("User initiated retry...");
+    initializationFailed = false;
+    loadTeachers(0);  // Reset retry counter
+}
+
+function disableMainContent() {
+    const buttons = document.querySelectorAll("button");
+    const inputs = document.querySelectorAll("input, select, textarea");
+    
+    buttons.forEach(btn => {
+        if (btn.id !== "retryBtn") {
+            btn.disabled = true;
+            btn.style.opacity = "0.5";
+            btn.style.cursor = "not-allowed";
+        }
+    });
+    
+    inputs.forEach(input => {
+        input.disabled = true;
+        input.style.opacity = "0.7";
+        input.style.cursor = "not-allowed";
+    });
+}
+
+function enableMainContent() {
+    const buttons = document.querySelectorAll("button");
+    const inputs = document.querySelectorAll("input, select, textarea");
+    
+    buttons.forEach(btn => {
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        btn.style.cursor = "pointer";
+    });
+    
+    inputs.forEach(input => {
+        input.disabled = false;
+        input.style.opacity = "1";
+        input.style.cursor = "auto";
+    });
 }
 
 function populateActivityTeacherDatalist(teachers) {
@@ -1127,5 +1263,67 @@ function showMessage(element, message, type) {
 // INITIALIZATION
 // ======================
 document.addEventListener("DOMContentLoaded", function() {
-    loadTeachers();
+    console.log("Page loaded, attempting to connect to backend...");
+    
+    // Show loading indicator while initializing
+    showLoadingIndicator();
+    
+    // Start loading teachers (with automatic retries)
+    loadTeachers(0);
 });
+
+function showLoadingIndicator() {
+    const loadingDiv = document.getElementById("loadingIndicator");
+    if (!loadingDiv) {
+        const container = document.body;
+        const newLoadingDiv = document.createElement("div");
+        newLoadingDiv.id = "loadingIndicator";
+        newLoadingDiv.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            z-index: 2000;
+            max-width: 300px;
+        `;
+        newLoadingDiv.innerHTML = `
+            <div style="margin-bottom: 20px;">
+                <div style="
+                    border: 4px solid #f3f3f3;
+                    border-top: 4px solid #1976d2;
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto;
+                "></div>
+            </div>
+            <p style="margin: 10px 0; color: #333; font-weight: 500;">Connecting to server...</p>
+            <p style="margin: 5px 0; color: #999; font-size: 14px;">This may take a moment on first load</p>
+        `;
+        
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        container.appendChild(newLoadingDiv);
+    }
+}
+
+function hideLoadingIndicator() {
+    const loadingDiv = document.getElementById("loadingIndicator");
+    if (loadingDiv) {
+        loadingDiv.style.display = "none";
+    }
+}
