@@ -46,8 +46,30 @@ const PERIOD_HEADERS = [
 let activities = [];
 let editingActivityIndex = null;
 
+function loadActivitiesFromStorage() {
+    const stored = localStorage.getItem("saec_activities");
+    if (!stored) return;
+    try {
+        const parsed = JSON.parse(stored);
+        activities = Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        activities = [];
+    }
+}
+
+function saveActivitiesToStorage() {
+    localStorage.setItem("saec_activities", JSON.stringify(activities));
+}
+
+function clearActivitiesFromStorage() {
+    localStorage.removeItem("saec_activities");
+}
+
 // Initialize activity type event listener
 document.addEventListener("DOMContentLoaded", function() {
+    loadActivitiesFromStorage();
+    renderActivities();
+
     const activityTypeSelect = document.getElementById("activityType");
     const activityThreePeriodCheckbox = document.getElementById("activityThreePeriod");
     const editActivityTypeSelect = document.getElementById("editActivityType");
@@ -391,6 +413,7 @@ async function addActivity() {
     };
 
     activities.push(activity);
+    saveActivitiesToStorage();
     renderActivities();
 
     // Reset personal fields for next entry
@@ -443,6 +466,7 @@ function renderActivities() {
 
 function removeActivity(index) {
     activities.splice(index, 1);
+    saveActivitiesToStorage();
     renderActivities();
 }
 
@@ -517,6 +541,7 @@ function saveEditedActivity() {
         occurrence_count: isMultipleOccurrences ? occurrenceCount : 1
     };
 
+    saveActivitiesToStorage();
     renderActivities();
     closeEditActivityModal();
 }
@@ -1252,6 +1277,9 @@ async function clearAllData() {
             document.getElementById("generatedTimetableSection").style.display = "none";
             currentTimetableData = null;
             currentTeacherNameMap = null;
+            activities = [];
+            clearActivitiesFromStorage();
+            renderActivities();
             loadTeachers();
             alert("✓ All data has been cleared successfully! The system has been reset to its initial state.");
         } else {
