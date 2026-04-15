@@ -4,9 +4,9 @@ const API_BASE = "https://saec-timetable-generator.onrender.com/api";
 
 // API retry configuration
 const API_CONFIG = {
-    MAX_RETRIES: 3,
-    RETRY_DELAY: 2000,  // 2 seconds between retries
-    TIMEOUT: 15000      // 15 second timeout for API calls
+    MAX_RETRIES: 1,
+    RETRY_DELAY: 1000,  // 1 second between retries
+    TIMEOUT: 5000      // 5 second timeout for API calls
 };
 
 // Global initialization state
@@ -168,6 +168,14 @@ function updateActivityDayAccess() {
 
 function updateActivitySectionAccess() {
     updateActivityTypeFields();
+}
+
+function toggleIntroDetails() {
+    const introMore = document.getElementById("introMore");
+    const toggleBtn = document.getElementById("introToggleBtn");
+    if (!introMore || !toggleBtn) return;
+    introMore.hidden = !introMore.hidden;
+    toggleBtn.textContent = introMore.hidden ? "Read More" : "Show Less";
 }
 
 // ======================
@@ -660,9 +668,8 @@ async function loadTeachers(retryCount = 0) {
                 loadTeachers(retryAttempt);
             }, API_CONFIG.RETRY_DELAY);
         } else {
-            // All retries exhausted - show error to user
+            // All retries exhausted - show error to user without blocking the page
             initializationFailed = true;
-            hideLoadingIndicator();
             showInitializationError(error.message);
             console.error("Failed to load teachers after all retries", error);
         }
@@ -705,8 +712,7 @@ function showInitializationError(errorMessage) {
         errorDiv.style.display = "block";
     }
 
-    // Disable main form if initialization failed
-    disableMainContent();
+    // Do not disable the page when backend loading fails; users can still retry or use functionality once the backend is back.
 }
 
 function hideInitializationError() {
@@ -1278,10 +1284,7 @@ function showMessage(element, message, type) {
 document.addEventListener("DOMContentLoaded", function() {
     console.log("Page loaded, attempting to connect to backend...");
     
-    // Show loading indicator while initializing
-    showLoadingIndicator();
-    
-    // Start loading teachers (with automatic retries)
+    // Start loading teachers in the background without blocking page rendering
     loadTeachers(0);
 });
 

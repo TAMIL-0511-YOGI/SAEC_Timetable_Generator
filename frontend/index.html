@@ -29,7 +29,7 @@
     }
     </script>
     
-    <title>SAEC Timetable Generator - AI Faculty Schedule Management System</title>
+    <title>SAEC AI-Powered Timetable Generator</title>
     <link rel="stylesheet" href="style.css">
     <link rel="canonical" href="https://saec-timetable-generator.vercel.app/">
 </head>
@@ -45,23 +45,37 @@
 
     <div class="container">
         <header>
-            <h1>SAEC Timetable Generator - AI-Powered Faculty Schedule Management</h1>
+            <h1>SAEC AI-Powered Timetable Generator</h1>
             <p>Automated Timetable Generation System for S. A. Engineering College</p>
-            <p style="color: #666; font-size: 14px; margin-top: 10px;">Intelligence-driven faculty scheduling | Conflict-free timetables | Optimal resource allocation | SAEC Academic Planning Tool</p>
+            <p class="header-tagline">Intelligence-driven faculty scheduling | Conflict-free timetables | Optimal resource allocation | SAEC Academic Planning Tool</p>
         </header>
 
-        <section style="background-color: #f0f8ff; padding: 20px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #1976d2;">
-            <h2 style="color: #1976d2; margin-top: 0;">Welcome to SAEC Timetable Generator</h2>
-            <p>This is the official <strong>SAEC Faculty Timetable Generator</strong> for S. A. Engineering College (Autonomous), Chennai. Use this platform to:</p>
-            <ul style="columns: 2; gap: 20px;">
-                <li>Generate conflict-free faculty schedules automatically</li>
-                <li>Manage teacher and subject assignments efficiently</li>
-                <li>Optimize laboratory and classroom resource allocation</li>
-                <li>Distribute free periods fairly among faculty members</li>
-                <li>Export timetables in PDF and Excel formats</li>
-                <li>Access your SAEC academic schedule anytime, anywhere</li>
-            </ul>
-            <p style="color: #d32f2f; font-weight: bold;">🔐 Data Security: All your SAEC faculty scheduling data is protected and only cleared when you explicitly confirm.</p>
+        <section class="intro-box">
+            <div class="intro-layout">
+                <div class="intro-left">
+                    <div class="intro-text">
+                        <h2>Welcome to SAEC Timetable Generator</h2>
+                        <p>This is the official <strong>SAEC Faculty Timetable Generator</strong> for S. A. Engineering College (Autonomous), Chennai.</p>
+                        <p>Use this platform to manage teacher assignments, optimize resource allocation, and export schedules securely.</p>
+                    </div>
+                    <div id="introMore" hidden>
+                        <p>Use this platform to:</p>
+                        <ul>
+                            <li>Generate conflict-free faculty schedules automatically</li>
+                            <li>Manage teacher and subject assignments efficiently</li>
+                            <li>Optimize laboratory and classroom resource allocation</li>
+                            <li>Distribute free periods fairly among faculty members</li>
+                            <li>Export timetables in PDF and Excel formats</li>
+                            <li>Access your SAEC academic schedule anytime, anywhere</li>
+                        </ul>
+                        <p class="security-note">🔐 Data Security: All your SAEC faculty scheduling data is protected and only cleared when you explicitly confirm.</p>
+                    </div>
+                    <button class="btn-link" onclick="toggleIntroDetails()" id="introToggleBtn">Read More</button>
+                </div>
+                <div class="intro-image-box">
+                    <img src="myimage.jpeg" alt="SAEC Campus Image">
+                </div>
+            </div>
         </section>
 
         <main id="mainContent">
@@ -141,10 +155,9 @@
             </div>
             <div id="teacherDatabaseContent"></div>
         </section>
-    </div>
 
-    <!-- Activity Database Section -->
-    <section class="section" id="activityDatabaseSection" style="display:none; margin: 0 auto; max-width: 1200px;">
+        <!-- Activity Database Section -->
+        <section class="section activity-section" id="activityDatabaseSection" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <h2 style="margin: 0;">Activity Database</h2>
             <button onclick="closeActivityDatabase()" class="btn-secondary">Back</button>
@@ -210,20 +223,21 @@
                 </div>
             </div>
 
-            <div style="margin-top: 12px;">
-                <label style="display: inline-flex; align-items: center; gap: 6px; font-weight: 500;">
-                    <input type="checkbox" id="activityThreePeriod" /> 3-Consecutive Period?
-                </label>
-            </div>
-
-            <div style="margin-top: 12px; padding: 8px; background-color: #fff3cd; border-radius: 4px;">
-                <label style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 500;">
-                    <input type="checkbox" id="activityMultipleOccurrences" /> Multiple Times/Week (Mini Project)
-                    <select id="activityOccurrenceCount" style="width: 80px; padding: 4px; margin-left: 4px;">
+            <div class="activity-option-panel">
+                <div class="activity-option-row">
+                    <label>
+                        <input type="checkbox" id="activityThreePeriod" /> 3-Consecutive Period?
+                    </label>
+                </div>
+                <div class="activity-option-row">
+                    <label>
+                        <input type="checkbox" id="activityMultipleOccurrences" /> Multiple Times/Week (Mini Project)
+                    </label>
+                    <select id="activityOccurrenceCount">
                         <option value="2">2 times</option>
                         <option value="3">3 times</option>
                     </select>
-                </label>
+                </div>
             </div>
 
             <h4 style="margin-top: 16px; margin-bottom: 12px;">Teachers (Up to 10)</h4>
