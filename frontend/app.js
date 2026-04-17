@@ -4,9 +4,9 @@ const API_BASE = "https://saec-timetable-generator.onrender.com/api";
 
 // API retry configuration
 const API_CONFIG = {
-    MAX_RETRIES: 1,
-    RETRY_DELAY: 1000,  // 1 second between retries
-    TIMEOUT: 5000      // 5 second timeout for API calls
+    MAX_RETRIES: 2,
+    RETRY_DELAY: 1500,  // 1.5 seconds between retries
+    TIMEOUT: 15000     // 15 second timeout for API calls
 };
 
 // Global initialization state
@@ -638,17 +638,25 @@ window.onclick = function(event) {
 // ======================
 // LOAD TEACHERS
 // ======================
+async function fetchWithTimeout(url, options = {}, timeout = API_CONFIG.TIMEOUT) {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+        const response = await fetch(url, { ...options, signal });
+        return response;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
 async function loadTeachers(retryCount = 0) {
     try {
-        // Create AbortController for timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
-
-        const response = await fetch(`${API_BASE}/teachers`, {
-            signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
+        const response = await fetchWithTimeout(`${API_BASE}/teachers`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        }, API_CONFIG.TIMEOUT);
 
         if (!response.ok) {
             throw new Error(`API returned status ${response.status}`);
@@ -684,7 +692,7 @@ async function loadTeachers(retryCount = 0) {
     } catch (error) {
         console.error("Error loading teachers:", error);
 
-        // Retry logic
+        // Retry logic for transient mobile/network failures
         if (retryCount < API_CONFIG.MAX_RETRIES) {
             const retryAttempt = retryCount + 1;
             console.log(`Retrying API call (${retryAttempt}/${API_CONFIG.MAX_RETRIES}) in ${API_CONFIG.RETRY_DELAY}ms...`);
@@ -693,9 +701,8 @@ async function loadTeachers(retryCount = 0) {
                 loadTeachers(retryAttempt);
             }, API_CONFIG.RETRY_DELAY);
         } else {
-            // All retries exhausted - show error to user without blocking the page
             initializationFailed = true;
-            showInitializationError(error.message);
+            showInitializationError(error.message || 'Unable to load backend data. Please retry.');
             console.error("Failed to load teachers after all retries", error);
         }
     }
@@ -847,7 +854,15 @@ function closeActivityDatabase() {
 
 async function loadTeacherDatabase() {
     try {
-        const response = await fetch(`${API_BASE}/teachers`);
+        const response = await fetchWithTimeout(`${API_BASE}/teachers`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        }, API_CONFIG.TIMEOUT);
+
+        if (!response.ok) {
+            throw new Error(`API returned status ${response.status}`);
+        }
+
         const teachers = await response.json();
         displayTeacherDatabase(teachers);
     } catch (error) {
