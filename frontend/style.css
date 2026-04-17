@@ -295,14 +295,19 @@ header p {
     margin-top: 12px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
     .intro-layout {
         flex-direction: column;
     }
 
     .intro-image-box {
+        flex: 1 1 100%;
         max-width: 100%;
         width: 100%;
+    }
+
+    .intro-image-box img {
+        min-height: auto;
     }
 }
 
