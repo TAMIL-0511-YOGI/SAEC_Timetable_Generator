@@ -47,6 +47,7 @@ let allTeachers = [];
 
 // Activity state
 const ACTIVITY_STORAGE_KEY = "saec_activities";
+const TEACHER_STORAGE_KEY = "saec_teachers";
 let activities = [];
 let editingActivityIndex = null;
 
@@ -60,6 +61,26 @@ function loadActivitiesFromLocalStorage() {
         console.warn("Failed to parse saved activities from local storage:", error);
         return [];
     }
+}
+
+function loadTeachersFromLocalStorage() {
+    const stored = localStorage.getItem(TEACHER_STORAGE_KEY);
+    if (!stored) return [];
+    try {
+        const parsed = JSON.parse(stored);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.warn("Failed to parse saved teachers from local storage:", error);
+        return [];
+    }
+}
+
+function saveTeachersToStorage(teachers) {
+    localStorage.setItem(TEACHER_STORAGE_KEY, JSON.stringify(teachers));
+}
+
+function clearTeachersFromStorage() {
+    localStorage.removeItem(TEACHER_STORAGE_KEY);
 }
 
 async function loadActivitiesFromBackend() {
@@ -96,6 +117,67 @@ function saveActivitiesToStorage() {
 
 function clearActivitiesFromStorage() {
     localStorage.removeItem(ACTIVITY_STORAGE_KEY);
+}
+
+function mergeTeacherLists(backendTeachers, localTeachers) {
+    const merged = new Map();
+
+    (localTeachers || []).forEach((teacher) => {
+        if (teacher && teacher.teacher_id != null) {
+            merged.set(String(teacher.teacher_id), teacher);
+        }
+    });
+
+    (backendTeachers || []).forEach((teacher) => {
+        if (teacher && teacher.teacher_id != null) {
+            merged.set(String(teacher.teacher_id), teacher);
+        }
+    });
+
+    return Array.from(merged.values()).sort((a, b) => {
+        const aId = String(a.teacher_id);
+        const bId = String(b.teacher_id);
+        return aId.localeCompare(bId, undefined, { numeric: true, sensitivity: 'base' });
+    });
+}
+
+async function syncLocalTeachersToBackend(localTeachers, backendTeachers = []) {
+    const backendIds = new Set((backendTeachers || []).map((t) => String(t.teacher_id)));
+
+    for (const teacher of (localTeachers || [])) {
+        if (!teacher || teacher.teacher_id == null) continue;
+        const teacherId = String(teacher.teacher_id);
+        if (backendIds.has(teacherId)) continue;
+
+        try {
+            await fetch(`${API_BASE}/teachers`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ teacher_id: teacherId, name: teacher.name })
+            });
+
+            if (Array.isArray(teacher.subjects)) {
+                for (const subject of teacher.subjects) {
+                    if (!subject || !subject.name) continue;
+                    await fetch(`${API_BASE}/subjects`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            subject_name: subject.name,
+                            year: subject.year,
+                            section: subject.section,
+                            hours_per_week: subject.hours_per_week,
+                            teacher_id: teacherId,
+                            is_lab: subject.is_lab ? 1 : 0,
+                            lab_days: Array.isArray(subject.lab_days) ? subject.lab_days.join(',') : (subject.lab_days || '')
+                        })
+                    });
+                }
+            }
+        } catch (error) {
+            console.warn("Unable to sync local teacher to backend:", error);
+        }
+    }
 }
 
 async function saveActivityToBackend(activity) {
@@ -325,11 +407,26 @@ function toggleIntroDetails() {
     const introMore = document.getElementById("introMore");
     const toggleBtn = document.getElementById("introToggleBtn");
     const introLayout = document.querySelector(".intro-layout");
-    if (!introMore || !toggleBtn) return;
+    const imageBox = document.querySelector(".intro-image-box");
+    if (!introMore || !toggleBtn || !imageBox) return;
+
     const expanded = introMore.classList.toggle("expanded");
     toggleBtn.textContent = expanded ? "Show Less" : "Read More";
     if (introLayout) {
         introLayout.classList.toggle("expanded", expanded);
+    }
+
+    if (expanded) {
+        const expandedHeight = introMore.scrollHeight;
+        introMore.style.maxHeight = `${expandedHeight}px`;
+        introMore.style.opacity = "1";
+        introMore.style.marginTop = "16px";
+        imageBox.style.transform = `translateY(${expandedHeight}px)`;
+    } else {
+        introMore.style.maxHeight = "0";
+        introMore.style.opacity = "0";
+        introMore.style.marginTop = "0";
+        imageBox.style.transform = "translateY(0)";
     }
 }
 
@@ -814,6 +911,8 @@ async function fetchWithTimeout(url, options = {}, timeout = API_CONFIG.TIMEOUT)
 }
 
 async function loadTeachers(retryCount = 0) {
+    const localTeachers = loadTeachersFromLocalStorage();
+
     try {
         const response = await fetchWithTimeout(`${API_BASE}/teachers`, {
             method: 'GET',
@@ -824,8 +923,13 @@ async function loadTeachers(retryCount = 0) {
             throw new Error(`API returned status ${response.status}`);
         }
 
-        const teachers = await response.json();
+        const backendTeachers = await response.json();
+        const teachers = mergeTeacherLists(backendTeachers, localTeachers);
         allTeachers = teachers;
+        saveTeachersToStorage(teachers);
+
+        // Restore any local-only teachers back to the backend if they were lost remotely
+        await syncLocalTeachersToBackend(localTeachers, backendTeachers);
 
         // Clear any previous initialization errors
         hideInitializationError();
@@ -867,6 +971,12 @@ async function loadTeachers(retryCount = 0) {
             initializationFailed = true;
             showInitializationError(error.message || 'Unable to load backend data. Please retry.');
             console.error("Failed to load teachers after all retries", error);
+
+            allTeachers = localTeachers;
+            saveTeachersToStorage(localTeachers);
+            populateActivityTeacherSelects(localTeachers);
+            populateActivityTeacherDatalist(localTeachers);
+            displayTeachers(localTeachers);
         }
     }
 }
@@ -1459,6 +1569,7 @@ async function clearAllData() {
             currentTeacherNameMap = null;
             activities = [];
             clearActivitiesFromStorage();
+            clearTeachersFromStorage();
             renderActivities();
             loadTeachers();
             alert("✓ All data has been cleared successfully! The system has been reset to its initial state.");
