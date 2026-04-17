@@ -261,7 +261,11 @@
 
         <!-- Activity List -->
         <div style="margin-bottom: -30px; padding-bottom: 30px;">
-            <h3 style="margin-top: 0; margin-bottom: 12px;">Added Activities</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
+                <h3 style="margin:0;">Added Activities</h3>
+                <button onclick="syncActivities()" class="btn-secondary" style="padding: 8px 14px; font-size:0.95em;">Sync Activities</button>
+            </div>
+            <div id="activitySyncMessage" class="message"></div>
             <div id="activityList" class="activity-list"></div>
         </div>
     </section>

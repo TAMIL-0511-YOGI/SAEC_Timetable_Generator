@@ -182,6 +182,20 @@ async function loadActivities() {
     activities = localActivities;
 }
 
+async function syncActivities() {
+    await loadActivities();
+    renderActivities();
+    const syncMessage = document.getElementById("activitySyncMessage");
+    if (syncMessage) {
+        syncMessage.textContent = "Activity list refreshed from shared storage.";
+        syncMessage.className = "message success";
+        setTimeout(() => {
+            syncMessage.textContent = "";
+            syncMessage.className = "message";
+        }, 4000);
+    }
+}
+
 // Initialize activity type event listener
 document.addEventListener("DOMContentLoaded", async function() {
     await loadActivities();
@@ -976,9 +990,10 @@ function closeTeacherDatabase() {
     document.getElementById("mainContent").style.display = "block";
 }
 
-function openActivityDatabase() {
+async function openActivityDatabase() {
     document.getElementById("mainContent").style.display = "none";
     document.getElementById("activityDatabaseSection").style.display = "block";
+    await loadActivities();
     renderActivities();
 }
 
