@@ -42,6 +42,9 @@ const PERIOD_HEADERS = [
     { label: "P8", time: "3:15 - 4:05" }
 ];
 
+// Global teacher list for use across the app
+let allTeachers = [];
+
 // Activity state
 const ACTIVITY_STORAGE_KEY = "saec_activities";
 let activities = [];
@@ -632,10 +635,21 @@ function startEditActivity(index) {
     document.getElementById("editActivityMultipleOccurrences").checked = !!activity.multiple_occurrences;
     document.getElementById("editActivityOccurrenceCount").value = activity.occurrence_count || 1;
 
+    // Populate edit modal teacher selects with available teachers
+    const teacherNames = allTeachers.map(t => t.name);
     for (let i = 0; i < 10; i++) {
-        const teacherName = activity.teachers[i] || "";
         const select = document.getElementById(`editMultiTeacher${i + 1}`);
-        if (select) select.value = teacherName;
+        if (select) {
+            select.innerHTML = '<option value="">Select Teacher</option>';
+            teacherNames.forEach(name => {
+                const option = document.createElement("option");
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+            const teacherName = activity.teachers[i] || "";
+            select.value = teacherName;
+        }
     }
 
     updateActivityTypeFields("edit");
@@ -812,6 +826,7 @@ async function loadTeachers(retryCount = 0) {
         }
 
         const teachers = await response.json();
+        allTeachers = teachers;
 
         // Clear any previous initialization errors
         hideInitializationError();
@@ -1014,6 +1029,7 @@ async function loadTeacherDatabase() {
         }
 
         const teachers = await response.json();
+        allTeachers = teachers;
         displayTeacherDatabase(teachers);
     } catch (error) {
         console.error("Error loading teacher database:", error);
@@ -1479,6 +1495,15 @@ document.addEventListener("DOMContentLoaded", function() {
     
     // Start loading teachers in the background without blocking page rendering
     loadTeachers(0);
+});
+
+// Refresh data whenever page becomes visible (tab focus) to catch changes from other devices
+document.addEventListener("visibilitychange", function() {
+    if (document.visibilityState === "visible") {
+        console.log("Page became visible, syncing data from backend...");
+        loadTeachers(0);
+        loadActivities().then(() => renderActivities());
+    }
 });
 
 function showLoadingIndicator() {
