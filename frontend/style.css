@@ -243,6 +243,7 @@ header p {
     background: white;
     border: 1px solid rgba(0,0,0,0.08);
     box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+    transition: margin-top 0.3s ease;
 }
 
 .intro-image-box img {
@@ -251,6 +252,10 @@ header p {
     height: 100%;
     min-height: 320px;
     object-fit: cover;
+}
+
+.intro-layout.expanded .intro-image-box {
+    margin-top: 24px;
 }
 
 .intro-text h2 {

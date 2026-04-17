@@ -331,9 +331,13 @@ function updateActivitySectionAccess() {
 function toggleIntroDetails() {
     const introMore = document.getElementById("introMore");
     const toggleBtn = document.getElementById("introToggleBtn");
+    const introLayout = document.querySelector(".intro-layout");
     if (!introMore || !toggleBtn) return;
     introMore.hidden = !introMore.hidden;
     toggleBtn.textContent = introMore.hidden ? "Read More" : "Show Less";
+    if (introLayout) {
+        introLayout.classList.toggle("expanded", !introMore.hidden);
+    }
 }
 
 // ======================
