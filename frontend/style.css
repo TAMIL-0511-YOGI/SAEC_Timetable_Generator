@@ -910,7 +910,8 @@ td.class {
     margin-bottom: 20px;
 }
 
-.modal-content input {
+.modal-content input,
+.modal-content select {
     width: 100%;
     padding: 12px;
     margin-bottom: 15px;
@@ -918,9 +919,11 @@ td.class {
     border-radius: 6px;
     font-size: 1em;
     box-sizing: border-box;
+    min-width: 0;
 }
 
-.modal-content input:focus {
+.modal-content input:focus,
+.modal-content select:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
