@@ -421,12 +421,10 @@ function toggleIntroDetails() {
         introMore.style.maxHeight = `${expandedHeight}px`;
         introMore.style.opacity = "1";
         introMore.style.marginTop = "16px";
-        imageBox.style.transform = `translateY(${expandedHeight}px)`;
     } else {
         introMore.style.maxHeight = "0";
         introMore.style.opacity = "0";
         introMore.style.marginTop = "0";
-        imageBox.style.transform = "translateY(0)";
     }
 }
 
