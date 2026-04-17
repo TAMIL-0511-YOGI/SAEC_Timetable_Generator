@@ -43,31 +43,148 @@ const PERIOD_HEADERS = [
 ];
 
 // Activity state
+const ACTIVITY_STORAGE_KEY = "saec_activities";
 let activities = [];
 let editingActivityIndex = null;
 
-function loadActivitiesFromStorage() {
-    const stored = localStorage.getItem("saec_activities");
-    if (!stored) return;
+function loadActivitiesFromLocalStorage() {
+    const stored = localStorage.getItem(ACTIVITY_STORAGE_KEY);
+    if (!stored) return [];
     try {
         const parsed = JSON.parse(stored);
-        activities = Array.isArray(parsed) ? parsed : [];
+        return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
-        activities = [];
+        console.warn("Failed to parse saved activities from local storage:", error);
+        return [];
+    }
+}
+
+async function loadActivitiesFromBackend() {
+    try {
+        const response = await fetch(`${API_BASE}/activities`);
+        if (!response.ok) {
+            throw new Error(`Backend returned status ${response.status}`);
+        }
+        const data = await response.json();
+        if (!Array.isArray(data)) {
+            throw new Error("Invalid activities response from backend");
+        }
+        return data.map((activity) => ({
+            ...activity,
+            year: parseInt(activity.year, 10),
+            period: parseInt(activity.period, 10),
+            hours: parseInt(activity.hours, 10),
+            teachers: Array.isArray(activity.teachers) ? activity.teachers : [],
+            is_three_period: !!activity.is_three_period,
+            auto_generated: !!activity.auto_generated,
+            all_sections: !!activity.all_sections,
+            multiple_occurrences: !!activity.multiple_occurrences,
+            occurrence_count: parseInt(activity.occurrence_count, 10) || 1
+        }));
+    } catch (error) {
+        console.warn("Unable to load activities from backend:", error);
+        return null;
     }
 }
 
 function saveActivitiesToStorage() {
-    localStorage.setItem("saec_activities", JSON.stringify(activities));
+    localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(activities));
 }
 
 function clearActivitiesFromStorage() {
-    localStorage.removeItem("saec_activities");
+    localStorage.removeItem(ACTIVITY_STORAGE_KEY);
+}
+
+async function saveActivityToBackend(activity) {
+    try {
+        const response = await fetch(`${API_BASE}/activities`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(activity)
+        });
+        if (!response.ok) {
+            console.warn("Backend activity save failed:", response.status);
+            return null;
+        }
+        const data = await response.json();
+        return data.activity || null;
+    } catch (error) {
+        console.warn("Unable to save activity to backend:", error);
+        return null;
+    }
+}
+
+async function updateActivityOnBackend(activity) {
+    if (!activity.id) {
+        return saveActivityToBackend(activity);
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/activities/${activity.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(activity)
+        });
+        if (!response.ok) {
+            console.warn("Backend activity update failed:", response.status);
+            return null;
+        }
+        return activity;
+    } catch (error) {
+        console.warn("Unable to update activity on backend:", error);
+        return null;
+    }
+}
+
+async function deleteActivityFromBackend(activity) {
+    if (!activity || !activity.id) return false;
+
+    try {
+        const response = await fetch(`${API_BASE}/activities/${activity.id}`, {
+            method: "DELETE"
+        });
+        return response.ok;
+    } catch (error) {
+        console.warn("Unable to delete activity on backend:", error);
+        return false;
+    }
+}
+
+async function syncLocalActivitiesToBackend(localActivities) {
+    for (const activity of localActivities) {
+        if (activity.id) continue;
+        const saved = await saveActivityToBackend(activity);
+        if (saved && saved.id) {
+            activity.id = saved.id;
+        }
+    }
+    saveActivitiesToStorage();
+}
+
+async function loadActivities() {
+    const localActivities = loadActivitiesFromLocalStorage();
+    const backendActivities = await loadActivitiesFromBackend();
+
+    if (backendActivities !== null) {
+        if (backendActivities.length > 0) {
+            activities = backendActivities;
+            saveActivitiesToStorage();
+            return;
+        }
+        if (localActivities.length > 0) {
+            activities = localActivities;
+            saveActivitiesToStorage();
+            await syncLocalActivitiesToBackend(localActivities);
+            return;
+        }
+    }
+
+    activities = localActivities;
 }
 
 // Initialize activity type event listener
-document.addEventListener("DOMContentLoaded", function() {
-    loadActivitiesFromStorage();
+document.addEventListener("DOMContentLoaded", async function() {
+    await loadActivities();
     renderActivities();
 
     const activityTypeSelect = document.getElementById("activityType");
@@ -396,6 +513,7 @@ async function addActivity() {
     }
 
     const activity = {
+        id: null,
         day,
         year,
         period,
@@ -414,6 +532,13 @@ async function addActivity() {
 
     activities.push(activity);
     saveActivitiesToStorage();
+
+    const saved = await saveActivityToBackend(activity);
+    if (saved && saved.id) {
+        activity.id = saved.id;
+        saveActivitiesToStorage();
+    }
+
     renderActivities();
 
     // Reset personal fields for next entry
@@ -464,7 +589,12 @@ function renderActivities() {
     `).join('');
 }
 
-function removeActivity(index) {
+async function removeActivity(index) {
+    const activity = activities[index];
+    if (activity) {
+        await deleteActivityFromBackend(activity);
+    }
+
     activities.splice(index, 1);
     saveActivitiesToStorage();
     renderActivities();
@@ -503,7 +633,7 @@ function closeEditActivityModal() {
     editingActivityIndex = null;
 }
 
-function saveEditedActivity() {
+async function saveEditedActivity() {
     const index = editingActivityIndex;
     if (index === null || index === undefined) return;
 
@@ -540,6 +670,11 @@ function saveEditedActivity() {
         multiple_occurrences: isMultipleOccurrences,
         occurrence_count: isMultipleOccurrences ? occurrenceCount : 1
     };
+
+    const updated = await updateActivityOnBackend(activities[index]);
+    if (updated && updated.id && !activities[index].id) {
+        activities[index].id = updated.id;
+    }
 
     saveActivitiesToStorage();
     renderActivities();

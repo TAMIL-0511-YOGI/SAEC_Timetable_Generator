@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
-from database import add_teacher, add_subject, get_all_teachers, clear_all, delete_subject, update_subject, save_timetable, delete_teacher, update_teacher
+from database import add_teacher, add_subject, get_all_teachers, clear_all, delete_subject, update_subject, save_timetable, delete_teacher, update_teacher, get_all_activities, save_activity, update_activity, delete_activity
 from scheduler import generate
 from export import export_excel, export_pdf
 import os
@@ -105,6 +105,49 @@ def create_subject():
         )
         
         return jsonify({"message": "Subject added successfully"}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/activities", methods=["GET"])
+def get_activities():
+    """Return all saved activities from the database"""
+    try:
+        activities = get_all_activities()
+        return jsonify(activities), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/activities", methods=["POST"])
+def create_activity():
+    """Add a new institutional activity"""
+    try:
+        data = request.json or {}
+        if not data.get("type") or not data.get("year"):
+            return jsonify({"error": "Activity type and year are required"}), 400
+
+        activity_id = save_activity(data)
+        activity = get_all_activities()
+        created = next((item for item in activity if item.get("id") == activity_id), None)
+        return jsonify({"message": "Activity added successfully", "activity": created}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/activities/<int:activity_id>", methods=["PUT"])
+def edit_activity(activity_id):
+    """Update an existing activity"""
+    try:
+        data = request.json or {}
+        update_activity(activity_id, data)
+        return jsonify({"message": "Activity updated successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/activities/<int:activity_id>", methods=["DELETE"])
+def remove_activity(activity_id):
+    """Delete a saved activity"""
+    try:
+        delete_activity(activity_id)
+        return jsonify({"message": "Activity deleted successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

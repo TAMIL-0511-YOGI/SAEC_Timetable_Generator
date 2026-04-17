@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import json
 from models import Teacher, Subject
 
 DB_PATH = "timetable.db"
@@ -38,6 +39,25 @@ def init_db():
                     period INTEGER NOT NULL,
                     entry_type TEXT DEFAULT 'Class',
                     FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id)
+                )''')
+
+    # Activities table for persisted institutional activities
+    c.execute('''CREATE TABLE IF NOT EXISTS activities (
+                    activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    year INTEGER NOT NULL,
+                    section TEXT,
+                    day TEXT,
+                    period INTEGER,
+                    type TEXT NOT NULL,
+                    hours INTEGER NOT NULL,
+                    elective TEXT,
+                    elective_no TEXT,
+                    teachers TEXT,
+                    is_three_period INTEGER DEFAULT 0,
+                    auto_generated INTEGER DEFAULT 0,
+                    all_sections INTEGER DEFAULT 0,
+                    multiple_occurrences INTEGER DEFAULT 0,
+                    occurrence_count INTEGER DEFAULT 1
                 )''')
     
     conn.commit()
@@ -152,8 +172,121 @@ def clear_all():
     c.execute("DELETE FROM timetable_entries")
     c.execute("DELETE FROM subjects")
     c.execute("DELETE FROM teachers")
+    c.execute("DELETE FROM activities")
     conn.commit()
     conn.close()
+
+
+def save_activity(activity):
+    """Save a new activity to the database"""
+    conn = connect()
+    c = conn.cursor()
+    c.execute('''INSERT INTO activities 
+                 (year, section, day, period, type, hours, elective, elective_no, teachers, is_three_period, auto_generated, all_sections, multiple_occurrences, occurrence_count) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+              (
+                  activity.get('year'),
+                  activity.get('section'),
+                  activity.get('day'),
+                  activity.get('period'),
+                  activity.get('type'),
+                  activity.get('hours'),
+                  activity.get('elective'),
+                  activity.get('elective_no'),
+                  json.dumps(activity.get('teachers', [])),
+                  int(bool(activity.get('is_three_period'))),
+                  int(bool(activity.get('auto_generated'))),
+                  int(bool(activity.get('all_sections'))),
+                  int(bool(activity.get('multiple_occurrences'))),
+                  int(activity.get('occurrence_count', 1))
+              ))
+    activity_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return activity_id
+
+
+def get_all_activities():
+    """Return all saved activities from the database"""
+    conn = connect()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM activities ORDER BY activity_id ASC")
+    rows = c.fetchall()
+    activities = []
+
+    for row in rows:
+        activities.append({
+            "id": row["activity_id"],
+            "year": row["year"],
+            "section": row["section"],
+            "day": row["day"],
+            "period": row["period"],
+            "type": row["type"],
+            "hours": row["hours"],
+            "elective": row["elective"],
+            "elective_no": row["elective_no"],
+            "teachers": json.loads(row["teachers"] or "[]"),
+            "is_three_period": bool(row["is_three_period"]),
+            "auto_generated": bool(row["auto_generated"]),
+            "all_sections": bool(row["all_sections"]),
+            "multiple_occurrences": bool(row["multiple_occurrences"]),
+            "occurrence_count": row["occurrence_count"]
+        })
+
+    conn.close()
+    return activities
+
+
+def update_activity(activity_id, activity):
+    """Update an existing activity record"""
+    conn = connect()
+    c = conn.cursor()
+    c.execute('''UPDATE activities SET
+                 year = ?,
+                 section = ?,
+                 day = ?,
+                 period = ?,
+                 type = ?,
+                 hours = ?,
+                 elective = ?,
+                 elective_no = ?,
+                 teachers = ?,
+                 is_three_period = ?,
+                 auto_generated = ?,
+                 all_sections = ?,
+                 multiple_occurrences = ?,
+                 occurrence_count = ?
+                 WHERE activity_id = ?''',
+              (
+                  activity.get('year'),
+                  activity.get('section'),
+                  activity.get('day'),
+                  activity.get('period'),
+                  activity.get('type'),
+                  activity.get('hours'),
+                  activity.get('elective'),
+                  activity.get('elective_no'),
+                  json.dumps(activity.get('teachers', [])),
+                  int(bool(activity.get('is_three_period'))),
+                  int(bool(activity.get('auto_generated'))),
+                  int(bool(activity.get('all_sections'))),
+                  int(bool(activity.get('multiple_occurrences'))),
+                  int(activity.get('occurrence_count', 1)),
+                  activity_id
+              ))
+    conn.commit()
+    conn.close()
+
+
+def delete_activity(activity_id):
+    """Delete an activity record"""
+    conn = connect()
+    c = conn.cursor()
+    c.execute("DELETE FROM activities WHERE activity_id = ?", (activity_id,))
+    conn.commit()
+    conn.close()
+
 
 def save_timetable(timetable_dict):
     """Save generated timetable to database"""
@@ -175,5 +308,4 @@ def save_timetable(timetable_dict):
     conn.close()
 
 # Initialize database on import
-if not os.path.exists(DB_PATH):
-    init_db()
+init_db()
