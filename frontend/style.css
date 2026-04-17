@@ -243,9 +243,7 @@ header p {
     background: white;
     border: 1px solid rgba(0,0,0,0.08);
     box-shadow: 0 12px 24px rgba(0,0,0,0.12);
-    transition: margin-top 0.35s ease, box-shadow 0.35s ease;
-    align-self: flex-start;
-    margin-top: 0;
+    transition: transform 0.35s ease, box-shadow 0.35s ease;
 }
 
 .intro-image-box img {
@@ -267,10 +265,6 @@ header p {
     max-height: 1000px;
     opacity: 1;
     margin-top: 16px;
-}
-
-.intro-layout.expanded .intro-image-box {
-    margin-top: 24px;
 }
 
 .intro-text h2 {

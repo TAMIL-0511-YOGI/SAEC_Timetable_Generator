@@ -407,12 +407,26 @@ function toggleIntroDetails() {
     const introMore = document.getElementById("introMore");
     const toggleBtn = document.getElementById("introToggleBtn");
     const introLayout = document.querySelector(".intro-layout");
-    if (!introMore || !toggleBtn) return;
+    const imageBox = document.querySelector(".intro-image-box");
+    if (!introMore || !toggleBtn || !imageBox) return;
 
     const expanded = introMore.classList.toggle("expanded");
     toggleBtn.textContent = expanded ? "Show Less" : "Read More";
     if (introLayout) {
         introLayout.classList.toggle("expanded", expanded);
+    }
+
+    if (expanded) {
+        const expandedHeight = introMore.scrollHeight;
+        introMore.style.maxHeight = `${expandedHeight}px`;
+        introMore.style.opacity = "1";
+        introMore.style.marginTop = "16px";
+        imageBox.style.transform = `translateY(${expandedHeight}px)`;
+    } else {
+        introMore.style.maxHeight = "0";
+        introMore.style.opacity = "0";
+        introMore.style.marginTop = "0";
+        imageBox.style.transform = "translateY(0)";
     }
 }
 
