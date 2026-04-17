@@ -253,12 +253,13 @@ document.addEventListener("DOMContentLoaded", async function() {
 
 // Enable/Disable fields based on Activity Type
 function updateActivityTypeFields(prefix = "") {
-    const activityType = document.getElementById(prefix + "activityType").value;
-    const daySelect = document.getElementById(prefix + "activityDay");
-    const periodInput = document.getElementById(prefix + "activityPeriod");
-    const sectionSelect = document.getElementById(prefix + "activitySection");
-    const hoursField = document.getElementById(prefix + "activityHours");
-    const hoursLabel = document.querySelector('label[for="' + prefix + 'activityHours"]');
+    const prefixId = prefix ? prefix + "Activity" : "activity";
+    const activityType = document.getElementById(prefixId + "Type").value;
+    const daySelect = document.getElementById(prefixId + "Day");
+    const periodInput = document.getElementById(prefixId + "Period");
+    const sectionSelect = document.getElementById(prefixId + "Section");
+    const hoursField = document.getElementById(prefixId + "Hours");
+    const hoursLabel = document.querySelector('label[for="' + prefixId + 'Hours"]');
 
     const manualTypes = ["PT", "Library"];
     const autoTypes = ["Professional Elective", "Open Elective", "Mini Project", "Skillrack/Placement", "Project Phase / Internship"];
