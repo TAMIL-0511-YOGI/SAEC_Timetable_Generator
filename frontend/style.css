@@ -243,7 +243,7 @@ header p {
     background: white;
     border: 1px solid rgba(0,0,0,0.08);
     box-shadow: 0 12px 24px rgba(0,0,0,0.12);
-    transition: margin-top 0.3s ease;
+    transition: transform 0.35s ease, box-shadow 0.35s ease;
 }
 
 .intro-image-box img {
@@ -255,7 +255,20 @@ header p {
 }
 
 .intro-layout.expanded .intro-image-box {
-    margin-top: 24px;
+    transform: translateY(24px);
+}
+
+#introMore {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, opacity 0.35s ease;
+}
+
+.intro-layout.expanded #introMore {
+    max-height: 1000px;
+    opacity: 1;
+    margin-top: 16px;
 }
 
 .intro-text h2 {

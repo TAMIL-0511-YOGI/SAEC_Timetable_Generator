@@ -169,19 +169,12 @@ async function loadActivities() {
     const backendActivities = await loadActivitiesFromBackend();
 
     if (backendActivities !== null) {
-        if (backendActivities.length > 0) {
-            activities = backendActivities;
-            saveActivitiesToStorage();
-            return;
-        }
-        if (localActivities.length > 0) {
-            activities = localActivities;
-            saveActivitiesToStorage();
-            await syncLocalActivitiesToBackend(localActivities);
-            return;
-        }
+        activities = backendActivities;
+        saveActivitiesToStorage();
+        return;
     }
 
+    // If backend is unavailable, fall back to local cache.
     activities = localActivities;
 }
 
@@ -333,10 +326,10 @@ function toggleIntroDetails() {
     const toggleBtn = document.getElementById("introToggleBtn");
     const introLayout = document.querySelector(".intro-layout");
     if (!introMore || !toggleBtn) return;
-    introMore.hidden = !introMore.hidden;
-    toggleBtn.textContent = introMore.hidden ? "Read More" : "Show Less";
+    const expanded = introMore.classList.toggle("expanded");
+    toggleBtn.textContent = expanded ? "Show Less" : "Read More";
     if (introLayout) {
-        introLayout.classList.toggle("expanded", !introMore.hidden);
+        introLayout.classList.toggle("expanded", expanded);
     }
 }
 
