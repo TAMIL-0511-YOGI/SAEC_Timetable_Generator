@@ -295,7 +295,8 @@ function updateActivityTypeFields(prefix = "") {
     }
 
     // Hours field should be enabled for all activity types (unless 3-period checkbox is checked)
-    const isThreePeriod = document.getElementById(prefix + "activityThreePeriod").checked;
+    const threePeriodCheckbox = document.getElementById(prefixId + "ThreePeriod");
+    const isThreePeriod = threePeriodCheckbox ? threePeriodCheckbox.checked : false;
     if (isThreePeriod) {
         hoursField.disabled = true;
         hoursField.style.opacity = "0.5";
