@@ -247,17 +247,17 @@ async function syncLocalActivitiesToBackend(localActivities) {
 }
 
 async function loadActivities() {
+    // Each tab starts with fresh/empty data - no backend loading on page load
+    // This ensures each teacher has their own isolated workspace
     const localActivities = loadActivitiesFromLocalStorage();
-    const backendActivities = await loadActivitiesFromBackend();
-
-    if (backendActivities !== null) {
-        activities = backendActivities;
-        saveActivitiesToStorage();
-        return;
+    
+    // Start with empty activities for each new tab
+    activities = [];
+    
+    // Only use local session storage if it exists (for page refresh within same tab)
+    if (localActivities && localActivities.length > 0) {
+        activities = localActivities;
     }
-
-    // If backend is unavailable, fall back to local cache.
-    activities = localActivities;
 }
 
 async function syncActivities() {
@@ -265,7 +265,7 @@ async function syncActivities() {
     renderActivities();
     const syncMessage = document.getElementById("activitySyncMessage");
     if (syncMessage) {
-        syncMessage.textContent = "Activity list refreshed from shared storage.";
+        syncMessage.textContent = "Working in isolated tab mode.";
         syncMessage.className = "message success";
         setTimeout(() => {
             syncMessage.textContent = "";
@@ -913,78 +913,28 @@ let autoRetryInterval = null;
 async function loadTeachers(retryCount = 0) {
     const localTeachers = loadTeachersFromLocalStorage();
 
-    try {
-        const response = await fetchWithTimeout(`${API_BASE}/teachers`, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
-        }, API_CONFIG.TIMEOUT);
-
-        if (!response.ok) {
-            throw new Error(`API returned status ${response.status}`);
-        }
-
-        const backendTeachers = await response.json();
-        const teachers = mergeTeacherLists(backendTeachers, localTeachers);
-        allTeachers = teachers;
-        saveTeachersToStorage(teachers);
-
-        // Restore any local-only teachers back to the backend if they were lost remotely
-        await syncLocalTeachersToBackend(localTeachers, backendTeachers);
-
-        // Clear any previous initialization errors
-        hideInitializationError();
-        hideLoadingIndicator();
-        initializationFailed = false;
-
-        // Update teacher dropdown
+    // Each tab starts with fresh/empty teacher list - no backend loading on page load
+    // This ensures each teacher has their own isolated workspace
+    // Only use local session storage if it exists (for page refresh within same tab)
+    if (localTeachers && localTeachers.length > 0) {
+        allTeachers = localTeachers;
+        populateActivityTeacherSelects(localTeachers);
+        populateActivityTeacherDatalist(localTeachers);
+        displayTeachers(localTeachers);
+    } else {
+        // Start with empty teacher list for each new tab
+        allTeachers = [];
         const teacherSelect = document.getElementById("teacherSelect");
-        const currentValue = teacherSelect.value;
-        teacherSelect.innerHTML = '<option value="">Select Teacher</option>';
-
-        teachers.forEach(teacher => {
-            const option = document.createElement("option");
-            option.value = teacher.teacher_id;
-            option.textContent = teacher.name;
-            teacherSelect.appendChild(option);
-        });
-
-        teacherSelect.value = currentValue;
-
-        // Update activity teacher selects and datalist for quick selection in activity form
-        populateActivityTeacherSelects(teachers);
-        populateActivityTeacherDatalist(teachers);
-
-        // Display teachers and subjects
-        displayTeachers(teachers);
-    } catch (error) {
-        console.error("Error loading teachers:", error);
-
-        // Retry logic for transient mobile/network failures
-        if (retryCount < API_CONFIG.MAX_RETRIES) {
-            const retryAttempt = retryCount + 1;
-            console.log(`Retrying API call (${retryAttempt}/${API_CONFIG.MAX_RETRIES}) in ${API_CONFIG.RETRY_DELAY}ms...`);
-            setTimeout(() => {
-                loadTeachers(retryAttempt);
-            }, API_CONFIG.RETRY_DELAY);
-        } else {
-            initializationFailed = true;
-            showInitializationError(error.message || 'Unable to load backend data. Please retry.');
-            console.error("Failed to load teachers after all retries", error);
-
-            allTeachers = localTeachers;
-            saveTeachersToStorage(localTeachers);
-            populateActivityTeacherSelects(localTeachers);
-            populateActivityTeacherDatalist(localTeachers);
-            displayTeachers(localTeachers);
-
-            // Start auto-retry every 5 seconds if not already started
-            if (!autoRetryInterval) {
-                autoRetryInterval = setInterval(() => {
-                    loadTeachers(0);
-                }, 5000);
-            }
+        if (teacherSelect) {
+            teacherSelect.innerHTML = '<option value="">Select Teacher</option>';
         }
+        populateActivityTeacherSelects([]);
+        populateActivityTeacherDatalist([]);
+        displayTeachers([]);
     }
+    
+    // Note: Backend sync can be triggered manually by a "Sync" button if needed
+    // For now, each tab works independently without auto-loading from shared backend
 }
 
 function showInitializationError(errorMessage) {
