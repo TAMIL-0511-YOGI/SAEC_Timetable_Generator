@@ -242,10 +242,13 @@ def download_pdf():
 @app.route("/api/teachers/<string:teacher_id>", methods=["DELETE"])
 def remove_teacher(teacher_id):
     """Delete a specific teacher and their subjects"""
+    print(f"DEBUG: Received DELETE request for teacher_id={teacher_id}")
     try:
         delete_teacher(teacher_id)
+        print(f"DEBUG: Successfully deleted teacher_id={teacher_id}")
         return jsonify({"message": "Teacher deleted successfully"}), 200
     except Exception as e:
+        print(f"ERROR: Failed to delete teacher_id={teacher_id}, error={e}")
         return jsonify({"error": str(e)}), 500
 
 

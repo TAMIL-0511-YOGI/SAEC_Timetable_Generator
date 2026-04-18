@@ -1,6 +1,6 @@
 // Frontend is deployed on Vercel, backend is hosted separately on Render.
 // Use the Render backend URL directly for API calls.
-const API_BASE = "https://saec-timetable-generator.onrender.com/api";
+const API_BASE = "http://127.0.0.1:5000/api";
 
 // API retry configuration
 const API_CONFIG = {
@@ -1189,6 +1189,7 @@ async function deleteTeacher(teacherId) {
 
         const data = await response.json();
         if (response.ok) {
+            clearTeachersFromStorage(); // Clear localStorage cache to prevent deleted teachers from reappearing
             await loadTeachers();
             await loadTeacherDatabase();
         } else {
