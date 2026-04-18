@@ -52,7 +52,7 @@ let activities = [];
 let editingActivityIndex = null;
 
 function loadActivitiesFromLocalStorage() {
-    const stored = localStorage.getItem(ACTIVITY_STORAGE_KEY);
+    const stored = sessionStorage.getItem(ACTIVITY_STORAGE_KEY);
     if (!stored) return [];
     try {
         const parsed = JSON.parse(stored);
@@ -64,7 +64,7 @@ function loadActivitiesFromLocalStorage() {
 }
 
 function loadTeachersFromLocalStorage() {
-    const stored = localStorage.getItem(TEACHER_STORAGE_KEY);
+    const stored = sessionStorage.getItem(TEACHER_STORAGE_KEY);
     if (!stored) return [];
     try {
         const parsed = JSON.parse(stored);
@@ -76,11 +76,11 @@ function loadTeachersFromLocalStorage() {
 }
 
 function saveTeachersToStorage(teachers) {
-    localStorage.setItem(TEACHER_STORAGE_KEY, JSON.stringify(teachers));
+    sessionStorage.setItem(TEACHER_STORAGE_KEY, JSON.stringify(teachers));
 }
 
 function clearTeachersFromStorage() {
-    localStorage.removeItem(TEACHER_STORAGE_KEY);
+    sessionStorage.removeItem(TEACHER_STORAGE_KEY);
 }
 
 async function loadActivitiesFromBackend() {
@@ -112,11 +112,11 @@ async function loadActivitiesFromBackend() {
 }
 
 function saveActivitiesToStorage() {
-    localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(activities));
+    sessionStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(activities));
 }
 
 function clearActivitiesFromStorage() {
-    localStorage.removeItem(ACTIVITY_STORAGE_KEY);
+    sessionStorage.removeItem(ACTIVITY_STORAGE_KEY);
 }
 
 function mergeTeacherLists(backendTeachers, localTeachers) {
