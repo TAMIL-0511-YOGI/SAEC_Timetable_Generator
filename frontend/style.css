@@ -206,7 +206,7 @@ header p {
 
 .intro-box {
     background-color: #f0f8ff;
-    padding: 18px 24px;
+    padding: 0;
     border-radius: 10px;
     margin: 0 0 26px;
     margin-top: 12px;
@@ -216,27 +216,32 @@ header p {
 
 .intro-layout {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    width: 100%;
 }
 
 .intro-left {
-    width: 100%;
-    max-width: 760px;
+    width: 60%;
+    max-width: none;
     display: flex;
     flex-direction: column;
     gap: 10px;
+    justify-content: center;
+    padding: 32px 32px 32px 32px;
 }
 
 .intro-text {
     flex: 0 0 auto;
+    text-align: left;
 }
 
 .intro-image-box {
-    width: 100%;
-    max-width: 380px;
-    max-height: 300px;
+    width: 40%;
+    max-width: 420px;
+    min-width: 260px;
+    max-height: 340px;
     min-height: 220px;
     border-radius: 14px;
     overflow: hidden;
@@ -244,7 +249,7 @@ header p {
     border: 1px solid rgba(0,0,0,0.08);
     box-shadow: 0 12px 24px rgba(0,0,0,0.12);
     transition: box-shadow 0.35s ease;
-    margin: 0 auto;
+    margin: auto 0 auto auto;
 }
 
 .intro-image-box img {
@@ -314,13 +319,16 @@ header p {
     .intro-layout {
         flex-direction: column;
     }
-
-    .intro-image-box {
-        flex: 1 1 100%;
-        max-width: 100%;
+    .intro-left {
         width: 100%;
+        padding: 24px 18px 24px 18px;
     }
-
+    .intro-image-box {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        margin: 0 auto;
+    }
     .intro-image-box img {
         min-height: auto;
     }
