@@ -1564,20 +1564,14 @@ function showMessage(element, message, type) {
 // INITIALIZATION
 // ======================
 document.addEventListener("DOMContentLoaded", function() {
-    console.log("Page loaded, attempting to connect to backend...");
+    console.log("Page loaded in isolated tab mode.");
     
-    // Start loading teachers in the background without blocking page rendering
+    // Start with local data only - no backend auto-load
     loadTeachers(0);
 });
 
-// Refresh data whenever page becomes visible (tab focus) to catch changes from other devices
-document.addEventListener("visibilitychange", function() {
-    if (document.visibilityState === "visible") {
-        console.log("Page became visible, syncing data from backend...");
-        loadTeachers(0);
-        loadActivities().then(() => renderActivities());
-    }
-});
+// NOTE: Removed visibilitychange handler that was auto-loading from backend
+// Each tab now works independently without syncing when tab gains focus
 
 function showLoadingIndicator() {
     const loadingDiv = document.getElementById("loadingIndicator");
