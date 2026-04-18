@@ -908,6 +908,8 @@ async function fetchWithTimeout(url, options = {}, timeout = API_CONFIG.TIMEOUT)
     }
 }
 
+let autoRetryInterval = null;
+
 async function loadTeachers(retryCount = 0) {
     const localTeachers = loadTeachersFromLocalStorage();
 
@@ -961,7 +963,6 @@ async function loadTeachers(retryCount = 0) {
         if (retryCount < API_CONFIG.MAX_RETRIES) {
             const retryAttempt = retryCount + 1;
             console.log(`Retrying API call (${retryAttempt}/${API_CONFIG.MAX_RETRIES}) in ${API_CONFIG.RETRY_DELAY}ms...`);
-            
             setTimeout(() => {
                 loadTeachers(retryAttempt);
             }, API_CONFIG.RETRY_DELAY);
@@ -975,6 +976,13 @@ async function loadTeachers(retryCount = 0) {
             populateActivityTeacherSelects(localTeachers);
             populateActivityTeacherDatalist(localTeachers);
             displayTeachers(localTeachers);
+
+            // Start auto-retry every 5 seconds if not already started
+            if (!autoRetryInterval) {
+                autoRetryInterval = setInterval(() => {
+                    loadTeachers(0);
+                }, 5000);
+            }
         }
     }
 }
@@ -1022,6 +1030,12 @@ function hideInitializationError() {
     const errorDiv = document.getElementById("initializationError");
     if (errorDiv) {
         errorDiv.style.display = "none";
+    }
+
+    // Stop auto-retry if backend is available
+    if (autoRetryInterval) {
+        clearInterval(autoRetryInterval);
+        autoRetryInterval = null;
     }
 
     // Re-enable main form
