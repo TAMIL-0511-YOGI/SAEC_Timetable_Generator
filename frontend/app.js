@@ -1079,15 +1079,14 @@ function populateActivityTeacherDatalist(teachers) {
 }
 
 function populateActivityTeacherSelects(teachers) {
-    const teacherNames = teachers.map(t => t.name);
-    const teacherSelects = document.querySelectorAll(".teacher-select");
+    const teacherSelects = document.querySelectorAll(".teacher-select, #teacherSelect");
     teacherSelects.forEach(select => {
         const selected = select.value;
         select.innerHTML = '<option value="">Select Teacher</option>';
-        teacherNames.forEach(name => {
+        teachers.forEach(teacher => {
             const option = document.createElement("option");
-            option.value = name;
-            option.textContent = name;
+            option.value = teacher.teacher_id; // Use teacher_id as value
+            option.textContent = teacher.name; // Show name
             select.appendChild(option);
         });
         if (selected) {
