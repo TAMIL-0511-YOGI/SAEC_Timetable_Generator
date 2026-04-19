@@ -912,28 +912,17 @@ let autoRetryInterval = null;
 
 async function loadTeachers(retryCount = 0) {
     console.log("Loading teachers...");
-    const localTeachers = loadTeachersFromLocalStorage();
-    console.log("Local teachers:", localTeachers);
     
-    if (localTeachers && localTeachers.length > 0) {
-        allTeachers = localTeachers;
-        populateActivityTeacherSelects(localTeachers);
-        populateActivityTeacherDatalist(localTeachers);
-        displayTeachers(localTeachers);
-        console.log("Loaded", localTeachers.length, "teachers from local storage");
-    } else {
-        // If no teachers in local storage, fetch from backend
-        console.log("No local teachers, fetching from backend:", API_BASE + "/teachers");
-        try {
-            const response = await fetch(`${API_BASE}/teachers`, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' }
-            });
-            console.log("Backend response status:", response.status);
-            
-            if (!response.ok) {
-                throw new Error(`API returned status ${response.status}`);
-            }
+    // Always try to fetch from backend first to get the latest teachers
+    try {
+        console.log("Fetching from backend:", API_BASE + "/teachers");
+        const response = await fetch(`${API_BASE}/teachers`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+        console.log("Backend response status:", response.status);
+        
+        if (response.ok) {
             const backendTeachers = await response.json();
             console.log("Backend teachers:", backendTeachers);
             
@@ -944,28 +933,35 @@ async function loadTeachers(retryCount = 0) {
                 populateActivityTeacherDatalist(backendTeachers);
                 displayTeachers(backendTeachers);
                 console.log("Loaded", backendTeachers.length, "teachers from backend");
-            } else {
-                console.log("No teachers found in backend");
-                allTeachers = [];
-                const teacherSelect = document.getElementById("teacherSelect");
-                if (teacherSelect) {
-                    teacherSelect.innerHTML = '<option value="">Select Teacher</option>';
-                }
-                populateActivityTeacherSelects([]);
-                populateActivityTeacherDatalist([]);
-                displayTeachers([]);
+                return; // Success - no need to check localStorage
             }
-        } catch (error) {
-            console.error("Error loading teachers from backend:", error);
-            allTeachers = [];
-            const teacherSelect = document.getElementById("teacherSelect");
-            if (teacherSelect) {
-                teacherSelect.innerHTML = '<option value="">Select Teacher</option>';
-            }
-            populateActivityTeacherSelects([]);
-            populateActivityTeacherDatalist([]);
-            displayTeachers([]);
         }
+    } catch (error) {
+        console.error("Error fetching from backend:", error);
+    }
+    
+    // Fallback to localStorage if backend fails or returns empty
+    console.log("Falling back to localStorage...");
+    const localTeachers = loadTeachersFromLocalStorage();
+    console.log("Local teachers:", localTeachers);
+    
+    if (localTeachers && localTeachers.length > 0) {
+        allTeachers = localTeachers;
+        populateActivityTeacherSelects(localTeachers);
+        populateActivityTeacherDatalist(localTeachers);
+        displayTeachers(localTeachers);
+        console.log("Loaded", localTeachers.length, "teachers from local storage");
+    } else {
+        // No teachers anywhere
+        console.log("No teachers found anywhere");
+        allTeachers = [];
+        const teacherSelect = document.getElementById("teacherSelect");
+        if (teacherSelect) {
+            teacherSelect.innerHTML = '<option value="">Select Teacher</option>';
+        }
+        populateActivityTeacherSelects([]);
+        populateActivityTeacherDatalist([]);
+        displayTeachers([]);
     }
 }
 
