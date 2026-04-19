@@ -911,30 +911,41 @@ async function fetchWithTimeout(url, options = {}, timeout = API_CONFIG.TIMEOUT)
 let autoRetryInterval = null;
 
 async function loadTeachers(retryCount = 0) {
+    console.log("Loading teachers...");
     const localTeachers = loadTeachersFromLocalStorage();
+    console.log("Local teachers:", localTeachers);
+    
     if (localTeachers && localTeachers.length > 0) {
         allTeachers = localTeachers;
         populateActivityTeacherSelects(localTeachers);
         populateActivityTeacherDatalist(localTeachers);
         displayTeachers(localTeachers);
+        console.log("Loaded", localTeachers.length, "teachers from local storage");
     } else {
         // If no teachers in local storage, fetch from backend
+        console.log("No local teachers, fetching from backend:", API_BASE + "/teachers");
         try {
             const response = await fetch(`${API_BASE}/teachers`, {
                 method: 'GET',
                 headers: { 'Accept': 'application/json' }
             });
+            console.log("Backend response status:", response.status);
+            
             if (!response.ok) {
                 throw new Error(`API returned status ${response.status}`);
             }
             const backendTeachers = await response.json();
+            console.log("Backend teachers:", backendTeachers);
+            
             if (Array.isArray(backendTeachers) && backendTeachers.length > 0) {
                 allTeachers = backendTeachers;
                 saveTeachersToStorage(backendTeachers);
                 populateActivityTeacherSelects(backendTeachers);
                 populateActivityTeacherDatalist(backendTeachers);
                 displayTeachers(backendTeachers);
+                console.log("Loaded", backendTeachers.length, "teachers from backend");
             } else {
+                console.log("No teachers found in backend");
                 allTeachers = [];
                 const teacherSelect = document.getElementById("teacherSelect");
                 if (teacherSelect) {
@@ -945,7 +956,7 @@ async function loadTeachers(retryCount = 0) {
                 displayTeachers([]);
             }
         } catch (error) {
-            console.warn("Unable to load teachers from backend:", error);
+            console.error("Error loading teachers from backend:", error);
             allTeachers = [];
             const teacherSelect = document.getElementById("teacherSelect");
             if (teacherSelect) {
@@ -1102,6 +1113,9 @@ async function openActivityDatabase() {
     document.getElementById("activityDatabaseSection").style.display = "block";
     await loadActivities();
     renderActivities();
+    
+    // Ensure teacher dropdowns are populated
+    await loadTeachers();
 }
 
 function closeActivityDatabase() {
