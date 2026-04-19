@@ -912,29 +912,50 @@ let autoRetryInterval = null;
 
 async function loadTeachers(retryCount = 0) {
     const localTeachers = loadTeachersFromLocalStorage();
-
-    // Each tab starts with fresh/empty teacher list - no backend loading on page load
-    // This ensures each teacher has their own isolated workspace
-    // Only use local session storage if it exists (for page refresh within same tab)
     if (localTeachers && localTeachers.length > 0) {
         allTeachers = localTeachers;
         populateActivityTeacherSelects(localTeachers);
         populateActivityTeacherDatalist(localTeachers);
         displayTeachers(localTeachers);
     } else {
-        // Start with empty teacher list for each new tab
-        allTeachers = [];
-        const teacherSelect = document.getElementById("teacherSelect");
-        if (teacherSelect) {
-            teacherSelect.innerHTML = '<option value="">Select Teacher</option>';
+        // If no teachers in local storage, fetch from backend
+        try {
+            const response = await fetch(`${API_BASE}/teachers`, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!response.ok) {
+                throw new Error(`API returned status ${response.status}`);
+            }
+            const backendTeachers = await response.json();
+            if (Array.isArray(backendTeachers) && backendTeachers.length > 0) {
+                allTeachers = backendTeachers;
+                saveTeachersToStorage(backendTeachers);
+                populateActivityTeacherSelects(backendTeachers);
+                populateActivityTeacherDatalist(backendTeachers);
+                displayTeachers(backendTeachers);
+            } else {
+                allTeachers = [];
+                const teacherSelect = document.getElementById("teacherSelect");
+                if (teacherSelect) {
+                    teacherSelect.innerHTML = '<option value="">Select Teacher</option>';
+                }
+                populateActivityTeacherSelects([]);
+                populateActivityTeacherDatalist([]);
+                displayTeachers([]);
+            }
+        } catch (error) {
+            console.warn("Unable to load teachers from backend:", error);
+            allTeachers = [];
+            const teacherSelect = document.getElementById("teacherSelect");
+            if (teacherSelect) {
+                teacherSelect.innerHTML = '<option value="">Select Teacher</option>';
+            }
+            populateActivityTeacherSelects([]);
+            populateActivityTeacherDatalist([]);
+            displayTeachers([]);
         }
-        populateActivityTeacherSelects([]);
-        populateActivityTeacherDatalist([]);
-        displayTeachers([]);
     }
-    
-    // Note: Backend sync can be triggered manually by a "Sync" button if needed
-    // For now, each tab works independently without auto-loading from shared backend
 }
 
 function showInitializationError(errorMessage) {
