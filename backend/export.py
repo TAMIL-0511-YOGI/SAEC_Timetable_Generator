@@ -10,6 +10,25 @@ from database import get_all_teachers
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"]
 PERIODS = 8
 
+SHORT_ACTIVITY_LABELS = {
+    'physical training': 'PT',
+    'pt': 'PT',
+    'mini project': 'MP',
+    'professional elective': 'PE',
+    'open elective': 'OE',
+    'skillrack/placement': 'SR/PM',
+    'skillrack placement': 'SR/PM',
+    'library': 'Lib',
+    'project phase / internship': 'PI',
+    'project phase internship': 'PI',
+}
+
+def get_short_activity_name(name):
+    if not name or not isinstance(name, str):
+        return name
+    return SHORT_ACTIVITY_LABELS.get(name.strip().lower(), name)
+
+
 def export_excel(teacher_timetable, class_timetable=None, output_path="timetable.xlsx"):
     """Export timetable to Excel format with separate sheets for each teacher and class"""
     try:
@@ -56,8 +75,10 @@ def export_excel(teacher_timetable, class_timetable=None, output_path="timetable
                                 row.append("Break")
                             elif slot["type"] == "Free":
                                 row.append("")
+                            elif slot["type"] == "R&D":
+                                row.append("R&D")
                             else:
-                                subject = slot.get("subject", "")
+                                subject = get_short_activity_name(slot.get("subject", ""))
                                 class_name = slot.get("class", "")
                                 entry_type = slot.get("type", "Class")
                                 if entry_type == "Lab":
@@ -136,6 +157,8 @@ def export_excel(teacher_timetable, class_timetable=None, output_path="timetable
                                 ws.column_dimensions[cell.column_letter].width = 12
                             else:
                                 ws.column_dimensions[cell.column_letter].width = 14
+                                if value == 'R&D':
+                                    cell.fill = PatternFill(start_color='FFE6CC', end_color='FFE6CC', fill_type='solid')
                         ws.row_dimensions[current_row].height = 30
                         row_num += 1
                     
@@ -171,7 +194,7 @@ def export_excel(teacher_timetable, class_timetable=None, output_path="timetable
                                 elif slot["type"] == "Free":
                                     row.append("")
                                 else:
-                                    subject = slot.get("subject", "")
+                                    subject = get_short_activity_name(slot.get("subject", ""))
                                     entry_type = slot.get("type", "Class")
                                     if entry_type == "Lab":
                                         row.append(f"{subject} [LAB]")
@@ -249,6 +272,8 @@ def export_excel(teacher_timetable, class_timetable=None, output_path="timetable
                                     ws_class.column_dimensions[cell.column_letter].width = 12
                                 else:
                                     ws_class.column_dimensions[cell.column_letter].width = 14
+                                    if value == 'R&D':
+                                        cell.fill = PatternFill(start_color='FFE6CC', end_color='FFE6CC', fill_type='solid')
                             ws_class.row_dimensions[current_row].height = 30
                             row_num += 1
                         
@@ -349,15 +374,12 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                 teacher_name_text = f"<b><font size=12>{teacher.name}</font></b>"
                 story.append(Paragraph(teacher_name_text, teacher_style))
                 
-                # Subjects list
-                subjects_text = f"<i>Subjects: {', '.join(s.name for s in teacher.subjects)}</i>"
-                story.append(Paragraph(subjects_text, class_style))
-                
                 # Build table data
                 table_data = []
                 header = ["Day"] + [f"P{i+1}" for i in range(PERIODS)]
                 table_data.append(header)
                 
+                r_and_d_rows = []
                 for day in DAYS:
                     row = [day]
                     for period in range(PERIODS):
@@ -367,21 +389,18 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                             row.append("Break")
                         elif slot["type"] == "Free":
                             row.append("")
+                        elif slot["type"] == "R&D":
+                            row.append("R&D")
                         else:
-                            subject = slot.get("subject", "")
-                            class_name = slot.get("class", "")
-                            entry_type = slot.get("type", "Class")
-                            if entry_type == "Lab":
-                                row.append(f"{subject}\n({class_name})\n[LAB]")
-                            else:
-                                row.append(f"{subject}\n({class_name})")
-                    
+                                subject = get_short_activity_name(slot.get("subject", ""))
                     table_data.append(row)
+                    if "R&D" in row[1:]:
+                        r_and_d_rows.append(len(table_data) - 1)
                 
                 # Create and style table with equal column widths
                 col_widths = [0.9*inch] + [0.75*inch]*PERIODS
                 table = Table(table_data, colWidths=col_widths)
-                table.setStyle(TableStyle([
+                table_style = TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#003366')),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -398,7 +417,10 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                     ('RIGHTPADDING', (0, 0), (-1, -1), 6),
                     ('TOPPADDING', (0, 1), (-1, -1), 6),
                     ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-                ]))
+                ])
+                for row_idx in r_and_d_rows:
+                    table_style.add('BACKGROUND', (0, row_idx), (-1, row_idx), colors.HexColor('#FFE6CC'))
+                table.setStyle(table_style)
                 
                 story.append(table)
 
@@ -436,18 +458,21 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                     table_data = []
                     header = ["Day"] + [f"P{i+1}" for i in range(PERIODS)]
                     table_data.append(header)
-                    
+                    r_and_d_rows = []
+
                     for day in DAYS:
                         row = [day]
                         for period in range(PERIODS):
                             slot = schedule[day][period]
-                            
+
                             if slot["type"] == "Break":
                                 row.append("Break")
                             elif slot["type"] == "Free":
                                 row.append("")
+                            elif slot["type"] == "R&D":
+                                row.append("R&D")
                             else:
-                                subject = slot.get("subject", "")
+                                subject = get_short_activity_name(slot.get("subject", ""))
                                 entry_type = slot.get("type", "Class")
                                 if entry_type == "Lab":
                                     row.append(f"{subject}\n[LAB]")
@@ -455,12 +480,14 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                                     row.append(f"{subject}\n[Activity]")
                                 else:
                                     row.append(subject)
-                        
+
                         table_data.append(row)
-                    
+                        if "R&D" in row[1:]:
+                            r_and_d_rows.append(len(table_data) - 1)
+
                     # Create and style table
                     table = Table(table_data, colWidths=[0.8*inch] + [0.7*inch]*PERIODS)
-                    table.setStyle(TableStyle([
+                    table_style = TableStyle([
                         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4788')),
                         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -472,7 +499,10 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                         ('GRID', (0, 0), (-1, -1), 1, colors.black),
                         ('FONTSIZE', (0, 1), (-1, -1), 8),
                         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
-                    ]))
+                    ])
+                    for row_idx in r_and_d_rows:
+                        table_style.add('BACKGROUND', (0, row_idx), (-1, row_idx), colors.HexColor('#FFE6CC'))
+                    table.setStyle(table_style)
                     
                     story.append(table)
 

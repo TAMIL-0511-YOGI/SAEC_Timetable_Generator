@@ -31,6 +31,22 @@ PDF_FILE = os.path.join(BASE_DIR, "timetable.pdf")
 
 latest_timetable = None
 
+def filter_timetable_data(timetable, view_type, item_key=None):
+    teachers_timetable = {}
+    classes_timetable = {}
+
+    if view_type == 'student':
+        classes_timetable = timetable.get('classes', {})
+        if item_key:
+            classes_timetable = {k: v for k, v in classes_timetable.items() if k == item_key}
+    else:
+        teachers_timetable = timetable.get('teachers', {})
+        if item_key:
+            teachers_timetable = {k: v for k, v in teachers_timetable.items() if k == item_key}
+
+    return teachers_timetable, classes_timetable
+
+
 def remove_existing_export_file(path):
     if os.path.exists(path):
         try:
@@ -75,11 +91,12 @@ def create_teacher():
         data = request.json
         teacher_id = data.get("teacher_id")
         name = data.get("name")
+        rnd_day = data.get("rnd_day", "")
         
         if not teacher_id or not name:
             return jsonify({"error": "teacher_id and name are required"}), 400
         
-        add_teacher(teacher_id, name)
+        add_teacher(teacher_id, name, rnd_day=rnd_day)
         return jsonify({"message": "Teacher added successfully", "teacher_id": teacher_id}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -93,6 +110,10 @@ def create_subject():
         required_fields = ["subject_name", "year", "section", "hours_per_week", "teacher_id"]
         if not all(field in data for field in required_fields):
             return jsonify({"error": f"Missing required fields: {required_fields}"}), 400
+
+        teacher_ids = data.get("teacher_ids")
+        if data.get("is_lab") and isinstance(teacher_ids, list) and len(teacher_ids) < 3:
+            return jsonify({"error": "Lab subjects must have three teacher selections."}), 400
         
         add_subject(
             subject_name=data.get("subject_name"),
@@ -101,7 +122,8 @@ def create_subject():
             hours_per_week=int(data.get("hours_per_week")),
             teacher_id=data.get("teacher_id"),
             is_lab=int(data.get("is_lab", 0)),
-            lab_days=data.get("lab_days", "0")  # Default: Monday only
+            lab_days=data.get("lab_days", ""),
+            teacher_ids=teacher_ids
         )
         
         return jsonify({"message": "Subject added successfully"}), 201
@@ -163,9 +185,16 @@ def gen_timetable():
             return jsonify({"error": "No teachers found. Please add teachers and subjects first."}), 400
 
         request_data = request.json or {}
-        activities = request_data.get("activities", [])
+        request_activities = request_data.get("activities", []) or []
+        saved_activities = get_all_activities()
 
-        latest_timetable = generate(teachers, activities)
+        # Merge frontend request activities with persisted saved activities.
+        # Keep request activity objects first, then add any saved activities not already included.
+        requested_ids = {str(a.get('id')) for a in request_activities if a.get('id')}
+        merged_activities = list(request_activities)
+        merged_activities.extend([a for a in saved_activities if str(a.get('id')) not in requested_ids])
+
+        latest_timetable = generate(teachers, merged_activities)
 
         # Save only teacher schedules to timetable_entries for backward compatibility
         save_timetable(latest_timetable.get('teachers', {}))
@@ -186,19 +215,17 @@ def download_excel():
             return jsonify({"error": "No timetable generated yet"}), 400
 
         view_type = request.args.get('view_type', 'teacher')
-        teachers_timetable = {}
-        classes_timetable = {}
+        item_key = request.args.get('item_key')
+        teachers_timetable, classes_timetable = filter_timetable_data(latest_timetable, view_type, item_key)
 
         if view_type == 'student':
-            classes_timetable = latest_timetable.get('classes', {})
             if not classes_timetable:
                 return jsonify({"error": "No student timetable data available"}), 400
         else:
-            teachers_timetable = latest_timetable.get('teachers', {})
             if not teachers_timetable:
                 return jsonify({"error": "No teacher timetable data available"}), 400
 
-        print(f"DEBUG: Downloading Excel for view_type={view_type}")
+        print(f"DEBUG: Downloading Excel for view_type={view_type}, item_key={item_key}")
         print(f"DEBUG: Teacher keys = {list(teachers_timetable.keys())}")
         print(f"DEBUG: Class keys = {list(classes_timetable.keys())}")
         
@@ -217,19 +244,17 @@ def download_pdf():
             return jsonify({"error": "No timetable generated yet"}), 400
 
         view_type = request.args.get('view_type', 'teacher')
-        teachers_timetable = {}
-        classes_timetable = {}
+        item_key = request.args.get('item_key')
+        teachers_timetable, classes_timetable = filter_timetable_data(latest_timetable, view_type, item_key)
 
         if view_type == 'student':
-            classes_timetable = latest_timetable.get('classes', {})
             if not classes_timetable:
                 return jsonify({"error": "No student timetable data available"}), 400
         else:
-            teachers_timetable = latest_timetable.get('teachers', {})
             if not teachers_timetable:
                 return jsonify({"error": "No teacher timetable data available"}), 400
         
-        print(f"DEBUG: Downloading PDF for view_type={view_type}")
+        print(f"DEBUG: Downloading PDF for view_type={view_type}, item_key={item_key}")
         print(f"DEBUG: Teacher keys = {list(teachers_timetable.keys())}")
         print(f"DEBUG: Class keys = {list(classes_timetable.keys())}")
         
@@ -258,10 +283,11 @@ def edit_teacher(teacher_id):
     try:
         data = request.json
         name = data.get("name")
+        rnd_day = data.get("rnd_day")
         if not name:
             return jsonify({"error": "Teacher name is required"}), 400
 
-        update_teacher(teacher_id, name)
+        update_teacher(teacher_id, name, rnd_day=rnd_day)
         return jsonify({"message": "Teacher updated successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -288,7 +314,8 @@ def edit_subject(subject_id):
             year=int(data.get("year")),
             section=data.get("section"),
             hours_per_week=int(data.get("hours_per_week")),
-            is_lab=int(data.get("is_lab", 0))
+            is_lab=int(data.get("is_lab", 0)),
+            teacher_ids=data.get("teacher_ids")
         )
         
         return jsonify({"message": "Subject updated successfully"}), 200

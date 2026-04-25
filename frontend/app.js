@@ -1,6 +1,8 @@
 // Frontend is deployed on Vercel, backend is hosted separately on Render.
-// Use the Render backend URL directly for API calls.
-const API_BASE = "https://saec-timetable-generator.onrender.com/api";
+// Use the local backend API when running locally, otherwise use the deployed Render backend.
+const API_BASE = ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? '/api'
+    : 'https://saec-timetable-generator.onrender.com/api');
 
 // API retry configuration
 const API_CONFIG = {
@@ -85,29 +87,38 @@ function clearTeachersFromStorage() {
 
 async function loadActivitiesFromBackend() {
     try {
-        const response = await fetch(`${API_BASE}/activities`);
+        const response = await fetchWithTimeout(`${API_BASE}/activities`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        }, API_CONFIG.TIMEOUT);
+
         if (!response.ok) {
             throw new Error(`Backend returned status ${response.status}`);
         }
+
         const data = await response.json();
         if (!Array.isArray(data)) {
             throw new Error("Invalid activities response from backend");
         }
-        return data.map((activity) => ({
-            ...activity,
-            year: parseInt(activity.year, 10),
-            period: parseInt(activity.period, 10),
-            hours: parseInt(activity.hours, 10),
-            teachers: Array.isArray(activity.teachers) ? activity.teachers : [],
-            is_three_period: !!activity.is_three_period,
-            auto_generated: !!activity.auto_generated,
-            all_sections: !!activity.all_sections,
-            multiple_occurrences: !!activity.multiple_occurrences,
-            occurrence_count: parseInt(activity.occurrence_count, 10) || 1
-        }));
+
+        return {
+            online: true,
+            activities: data.map((activity) => ({
+                ...activity,
+                year: parseInt(activity.year, 10),
+                period: parseInt(activity.period, 10),
+                hours: parseInt(activity.hours, 10),
+                teachers: Array.isArray(activity.teachers) ? activity.teachers : [],
+                is_three_period: !!activity.is_three_period,
+                auto_generated: !!activity.auto_generated,
+                all_sections: !!activity.all_sections,
+                multiple_occurrences: !!activity.multiple_occurrences,
+                occurrence_count: parseInt(activity.occurrence_count, 10) || 1
+            }))
+        };
     } catch (error) {
         console.warn("Unable to load activities from backend:", error);
-        return null;
+        return { online: false, activities: [] };
     }
 }
 
@@ -247,25 +258,53 @@ async function syncLocalActivitiesToBackend(localActivities) {
 }
 
 async function loadActivities() {
-    // Each tab starts with fresh/empty data - no backend loading on page load
-    // This ensures each teacher has their own isolated workspace
     const localActivities = loadActivitiesFromLocalStorage();
-    
-    // Start with empty activities for each new tab
-    activities = [];
-    
-    // Only use local session storage if it exists (for page refresh within same tab)
-    if (localActivities && localActivities.length > 0) {
-        activities = localActivities;
+    const backendResult = await loadActivitiesFromBackend();
+    const backendActivities = backendResult.activities || [];
+    const backendOnline = backendResult.online;
+
+    const mergedActivities = [];
+    const backendIds = new Set(backendActivities.map(activity => activity.id));
+
+    // Start with backend activities so saved records are always available
+    mergedActivities.push(...backendActivities);
+
+    // Preserve any locally stored activities that are not yet synced or not present on backend
+    if (Array.isArray(localActivities) && localActivities.length > 0) {
+        for (const activity of localActivities) {
+            if (!activity) continue;
+            if (activity.id && backendIds.has(activity.id)) {
+                continue;
+            }
+            mergedActivities.push(activity);
+        }
     }
+
+    activities = mergedActivities;
+    saveActivitiesToStorage();
+
+    // Sync any locally created activities to the backend if they were not saved yet
+    const unsyncedActivities = activities.filter(activity => !activity.id);
+    if (unsyncedActivities.length > 0 && backendOnline) {
+        await syncLocalActivitiesToBackend(unsyncedActivities);
+        const refreshed = await loadActivitiesFromBackend();
+        if (refreshed.online) {
+            activities = refreshed.activities;
+            saveActivitiesToStorage();
+        }
+    }
+
+    return backendOnline;
 }
 
 async function syncActivities() {
-    await loadActivities();
+    const backendOnline = await loadActivities();
     renderActivities();
     const syncMessage = document.getElementById("activitySyncMessage");
     if (syncMessage) {
-        syncMessage.textContent = "Working in isolated tab mode.";
+        syncMessage.textContent = backendOnline
+            ? "Activities synced from backend."
+            : "Unable to reach backend. Working in isolated tab mode.";
         syncMessage.className = "message success";
         setTimeout(() => {
             syncMessage.textContent = "";
@@ -315,6 +354,12 @@ document.addEventListener("DOMContentLoaded", async function() {
                 }
             }
         });
+    }
+
+    const labCheckbox = document.getElementById("isLab");
+    if (labCheckbox) {
+        labCheckbox.addEventListener("change", () => toggleLabTeacherSelectors());
+        toggleLabTeacherSelectors();
     }
 
     if (editActivityTypeSelect) {
@@ -434,6 +479,7 @@ function toggleIntroDetails() {
 async function addTeacher() {
     const teacherId = document.getElementById("teacherId").value.trim();
     const teacherName = document.getElementById("teacherName").value.trim();
+    const rndDay = document.getElementById("teacherRndDay").value;
     const messageDiv = document.getElementById("teacherMessage");
 
     if (!teacherId || !teacherName) {
@@ -445,7 +491,7 @@ async function addTeacher() {
         const response = await fetch(`${API_BASE}/teachers`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ teacher_id: teacherId, name: teacherName })
+            body: JSON.stringify({ teacher_id: teacherId, name: teacherName, rnd_day: rndDay })
         });
 
         const data = await response.json();
@@ -454,6 +500,7 @@ async function addTeacher() {
             showMessage(messageDiv, "Teacher added successfully!", "success");
             document.getElementById("teacherId").value = "";
             document.getElementById("teacherName").value = "";
+            document.getElementById("teacherRndDay").value = "";
             loadTeachers();
         } else {
             showMessage(messageDiv, data.error || "Error adding teacher", "error");
@@ -466,6 +513,20 @@ async function addTeacher() {
 // ======================
 // ADD SUBJECT FUNCTIONS
 // ======================
+async function toggleLabTeacherSelectors() {
+    const isLab = document.getElementById("isLab").checked;
+    const labSelectors = document.getElementById("labTeacherSelectors");
+    if (labSelectors) {
+        labSelectors.style.display = isLab ? "flex" : "none";
+    }
+    if (!isLab) {
+        const second = document.getElementById("labTeacher2Select");
+        const third = document.getElementById("labTeacher3Select");
+        if (second) second.value = "";
+        if (third) third.value = "";
+    }
+}
+
 async function addSubject() {
     const teacherSelect = document.getElementById("teacherSelect");
     const subjectName = document.getElementById("subjectName").value.trim();
@@ -474,10 +535,25 @@ async function addSubject() {
     const hoursPerWeek = document.getElementById("hoursPerWeek").value;
     const isLab = document.getElementById("isLab").checked ? 1 : 0;
     const messageDiv = document.getElementById("subjectMessage");
+    const teacherIds = [teacherSelect.value];
 
     if (!teacherSelect.value || !subjectName || !yearLevel || !section || !hoursPerWeek) {
         showMessage(messageDiv, "Please fill all fields", "error");
         return;
+    }
+
+    if (isLab) {
+        const secondTeacher = document.getElementById("labTeacher2Select").value;
+        const thirdTeacher = document.getElementById("labTeacher3Select").value;
+        if (!secondTeacher || !thirdTeacher) {
+            showMessage(messageDiv, "Please select three teachers for the lab.", "error");
+            return;
+        }
+        if (secondTeacher === teacherIds[0] || thirdTeacher === teacherIds[0] || secondTeacher === thirdTeacher) {
+            showMessage(messageDiv, "Please select three different teachers for the lab.", "error");
+            return;
+        }
+        teacherIds.push(secondTeacher, thirdTeacher);
     }
 
     try {
@@ -490,6 +566,7 @@ async function addSubject() {
                 section: section,
                 hours_per_week: parseInt(hoursPerWeek),
                 teacher_id: teacherSelect.value,
+                teacher_ids: teacherIds,
                 is_lab: isLab,
                 lab_days: isLab ? "0" : ""  // Default: Monday only for labs
             })
@@ -680,24 +757,53 @@ function renderActivities() {
         return;
     }
 
-    container.innerHTML = activities.map((a, i) => `
-        <div class="activity-item">
-            <span>
-                Year ${a.year} ${a.section ? '| Section ' + a.section : ''} | ${a.type} | ${a.day} P${a.period} - ${a.hours} hr${a.hours > 1 ? 's' : ''}
-                ${a.is_three_period ? '(3 periods)' : ''}
-                ${a.multiple_occurrences ? `<span style="color: #ff6b35; font-weight: bold;">[${a.occurrence_count} times/week]</span>` : ''}
-                ${a.auto_generated ? '<span style="color: #d32f2f; font-weight: bold;">[Auto-Generated]</span>' : ''}
-                ${a.all_sections ? '<span style="color: #1976d2; font-weight: bold;">[All Sections]</span>' : ''}
-                ${a.elective ? '- Elective: ' + a.elective : ''}
-                ${a.elective_no ? '(No. ' + a.elective_no + ')' : ''}
-                ${a.teachers.length ? '- Instructors: ' + a.teachers.join(', ') : ''}
-            </span>
-            <div style="display: flex; gap: 6px;">
-                <button class="edit-btn icon-btn" onclick="startEditActivity(${i})" title="Edit activity" aria-label="Edit activity"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19.5 3 20l.5-4L16.5 3.5z"></path></svg></button>
-                <button class="delete-btn icon-btn" onclick="removeActivity(${i})" title="Delete activity" aria-label="Delete activity"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
-            </div>
-        </div>
-    `).join('');
+    container.innerHTML = activities.map((a, i) => {
+        const shortType = getShortActivityLabel(a.type);
+        let summary = `Year ${a.year}`;
+        if (a.section) summary += ` | Section ${a.section}`;
+        summary += ` | ${shortType} | ${a.day} P${a.period} - ${a.hours} hr${a.hours > 1 ? 's' : ''}`;
+        if (a.is_three_period) summary += ' (3 periods)';
+        if (a.multiple_occurrences) {
+            summary += ` <span style="color: #ff6b35; font-weight: bold;">[${a.occurrence_count} times/week]</span>`;
+        }
+        if (a.auto_generated) {
+            summary += ' <span style="color: #d32f2f; font-weight: bold;">[Auto-Generated]</span>';
+        }
+        if (a.all_sections) {
+            summary += ' <span style="color: #1976d2; font-weight: bold;">[All Sections]</span>';
+        }
+        if (a.elective) {
+            summary += ` - Elective: ${a.elective}`;
+        }
+        if (a.elective_no) {
+            summary += ` (No. ${a.elective_no})`;
+        }
+        if (a.teachers.length) {
+            summary += ` - Instructors: ${a.teachers.join(', ')}`;
+        }
+
+        return (
+            '<div class="activity-item">'
+            + '<span>' + summary + '</span>'
+            + '<div style="display: flex; gap: 6px;">'
+            + '<button class="edit-btn icon-btn" onclick="startEditActivity(' + i + ')" title="Edit activity" aria-label="Edit activity">'
+            + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M12 20h9"></path>'
+            + '<path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19.5 3 20l.5-4L16.5 3.5z"></path>'
+            + '</svg>'
+            + '</button>'
+            + '<button class="delete-btn icon-btn" onclick="removeActivity(' + i + ')" title="Delete activity" aria-label="Delete activity">'
+            + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            + '<polyline points="3 6 5 6 21 6"></polyline>'
+            + '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>'
+            + '<line x1="10" y1="11" x2="10" y2="17"></line>'
+            + '<line x1="14" y1="11" x2="14" y2="17"></line>'
+            + '</svg>'
+            + '</button>'
+            + '</div>'
+            + '</div>'
+        );
+    }).join('');
 }
 
 async function removeActivity(index) {
@@ -1145,28 +1251,43 @@ function displayTeacherDatabase(teachers) {
         return;
     }
 
+    const teacherById = teachers.reduce((map, teacher) => {
+        map[teacher.teacher_id] = teacher.name;
+        return map;
+    }, {});
+
     container.innerHTML = teachers.map(teacher => `
-        <div class="teacher-card" style="margin-bottom: 14px; border: 1px solid #c8d7f4;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap: 8px;">
-                <h3 style="margin:0; flex:1; min-width:0;">${teacher.name} (ID: ${teacher.teacher_id})</h3>
+        <div class="teacher-card" style="margin-bottom: 14px; border: 1px solid #c8d7f4; padding: 14px; border-radius: 10px; background: #f8fcff;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap: 12px;">
+                <div style="min-width:0; flex:1;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <h3 style="margin:0; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${teacher.name} (ID: ${teacher.teacher_id})</h3>
+                        ${teacher.rnd_day ? `<span style="display:inline-block; padding: 4px 10px; border-radius: 999px; background: #2e7d32; color: #fff; font-size: 0.78rem; font-weight: 700;">R&D ${teacher.rnd_day}</span>` : '<span style="display:inline-block; padding: 4px 10px; border-radius: 999px; background: #f1f1f1; color: #555; font-size: 0.78rem;">No R&D Day</span>'}
+                    </div>
+                </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button class="edit-btn icon-btn" onclick="editTeacher('${teacher.teacher_id}', '${teacher.name.replace(/'/g, "\\'")}')" title="Edit teacher" aria-label="Edit teacher"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+                    <button class="edit-btn icon-btn" onclick="editTeacher('${teacher.teacher_id}', '${teacher.name.replace(/'/g, "\\'")}', '${teacher.rnd_day || ''}')" title="Edit teacher" aria-label="Edit teacher"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
                     <button class="delete-btn icon-btn" onclick="deleteTeacher('${teacher.teacher_id}')" title="Delete teacher" aria-label="Delete teacher"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
                 </div>
             </div>
-            <p><strong>Total Hours:</strong> ${teacher.total_hours_per_week}</p>
-            <p><strong>Free periods:</strong> ${teacher.free_periods_count || 0}</p>
-            <p><strong>Subjects (${teacher.subjects.length}):</strong></p>
+            <p style="margin:12px 0 0 0;"><strong>Total Hours:</strong> ${teacher.total_hours_per_week}</p>
+            <p style="margin:4px 0 0 0;"><strong>Free periods:</strong> ${teacher.free_periods_count || 0}</p>
+            <p style="margin:4px 0 0 0;"><strong>Subjects (${teacher.subjects.length}):</strong></p>
             <div>
-                ${teacher.subjects.length === 0 ? `<p style='color:#999;'>No subjects</p>` : teacher.subjects.map(s => `
+                ${teacher.subjects.length === 0 ? `<p style='color:#999;'>No subjects</p>` : teacher.subjects.map(s => {
+                    const labTeacherInfo = s.teacher_ids && s.teacher_ids.length > 1 ? `<div style="font-size:0.86rem; color:#444; margin-top:2px;">Shared Lab Teachers: ${s.teacher_ids.map(id => {
+                        const idKey = String(id);
+                        return teacherById[idKey] ? `${teacherById[idKey]} (${idKey})` : idKey;
+                    }).join(', ')}</div>` : '';
+                    return `
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 8px;">
-                        <span style="flex:1; min-width:0;">${s.name} (${s.year}${s.section}) - ${s.hours_per_week} hr${s.hours_per_week > 1 ? 's' : ''}${s.is_lab ? ' [LAB]' : ''}</span>
+                        <span style="flex:1; min-width:0;">${s.name} (${s.year}${s.section}) - ${s.hours_per_week} hr${s.hours_per_week > 1 ? 's' : ''}${s.is_lab ? ' [LAB]' : ''}${labTeacherInfo}</span>
                         <div style="display:flex; gap:6px; flex-wrap: wrap;">
                             <button class="edit-btn icon-btn" onclick="showEditModal(${s.subject_id}, '${s.name}', ${s.year}, '${s.section}', ${s.hours_per_week}, ${s.is_lab})" title="Edit subject" aria-label="Edit subject"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
                             <button class="delete-btn icon-btn" onclick="deleteSubject(${s.subject_id})" title="Delete subject" aria-label="Delete subject"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
                         </div>
                     </div>
-                `).join('')}
+                `}).join('')}
             </div>
         </div>
     `).join('');
@@ -1194,14 +1315,17 @@ async function deleteTeacher(teacherId) {
     }
 }
 
-function editTeacher(teacherId, currentName) {
+function editTeacher(teacherId, currentName, currentRndDay) {
     const newName = prompt("Update teacher name:", currentName);
     if (!newName || newName.trim().length === 0) return;
+
+    const newRndDay = prompt("Update R&D day (Mon, Tue, Wed, Thu, Fri) or leave blank:", currentRndDay || "") || "";
+    const normalizedRndDay = ["Mon", "Tue", "Wed", "Thu", "Fri"].includes(newRndDay) ? newRndDay : "";
 
     fetch(`${API_BASE}/teachers/${teacherId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName.trim() })
+        body: JSON.stringify({ name: newName.trim(), rnd_day: normalizedRndDay })
     })
     .then(res => res.json())
     .then(data => {
@@ -1225,15 +1349,20 @@ function displayTeachers(teachers) {
     }
 
     container.innerHTML = teachers.map(teacher => `
-        <div class="teacher-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h3 style="margin:0;">${teacher.name} (ID: ${teacher.teacher_id})</h3>
-                <div style="display: flex; gap: 8px;">
-                    <button class="edit-btn icon-btn" onclick="editTeacher('${teacher.teacher_id}', '${teacher.name.replace("'", "\'")}')" title="Edit teacher" aria-label="Edit teacher"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+        <div class="teacher-card" style="padding: 14px; margin-bottom: 16px; border-radius: 12px; border: 1px solid #d8e6f6; background: #f7fbff;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div style="min-width:0; flex:1; display:flex; flex-direction:column; gap:6px;">
+                            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <h3 style="margin:0; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${teacher.name} (ID: ${teacher.teacher_id})</h3>
+                        ${teacher.rnd_day ? `<span style="display:inline-block; padding: 4px 10px; border-radius: 999px; background: #2e7d32; color: #fff; font-size: 0.78rem; font-weight: 700;">R&D ${teacher.rnd_day}</span>` : '<span style="display:inline-block; padding: 4px 10px; border-radius: 999px; background: #e0e0e0; color: #444; font-size: 0.78rem;">No R&D Day</span>'}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="edit-btn icon-btn" onclick="editTeacher('${teacher.teacher_id}', '${teacher.name.replace("'", "\'")}', '${teacher.rnd_day || ''}')" title="Edit teacher" aria-label="Edit teacher"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
                     <button class="delete-btn icon-btn" onclick="deleteTeacher('${teacher.teacher_id}')" title="Delete teacher" aria-label="Delete teacher"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
                 </div>
             </div>
-            <p><strong>Total Hours per Week:</strong> ${teacher.total_hours_per_week}</p>
+            <p style="margin:10px 0 0 0;"><strong>Total Hours per Week:</strong> ${teacher.total_hours_per_week}</p>
             <div style="margin-top: 10px;">
                 <strong>Subjects:</strong>
                 ${teacher.subjects.length === 0 ? 
@@ -1262,8 +1391,10 @@ function displayTeachers(teachers) {
 // ======================
 async function generateTimetable() {
     const messageDiv = document.getElementById("generateMessage");
+    await loadActivities(); // Refresh saved activities before generating
     
     try {
+        console.log("Generating timetable with activities:", activities);
         const response = await fetch(`${API_BASE}/generate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1297,9 +1428,15 @@ function buildTimetableSection(title, scheduleData, labelMapper = (key) => key) 
     return events.map(key => {
         const schedule = scheduleData[key];
         const displayLabel = labelMapper(key);
+        const downloadView = title === 'Class' ? 'student' : 'teacher';
         return `
             <div class="teacher-timetable">
-                <div class="timetable-title">${title}: ${displayLabel}</div>
+                <div class="timetable-header">
+                    <div class="timetable-title">${title}: ${displayLabel}</div>
+                    <button class="btn-download" data-view="${downloadView}" data-key="${encodeURIComponent(key)}">
+                        ⬇ Download
+                    </button>
+                </div>
                 <table class="timetable">
                     <thead>
                         <tr>
@@ -1384,6 +1521,7 @@ function showTeachersTimetables() {
     }
 
     container.innerHTML = html;
+    attachPerTableDownloadButtons(container);
 
     // Update active button state
     const teacherBtn = document.getElementById("teacherTimetableBtn");
@@ -1409,12 +1547,47 @@ function showStudentsTimetables() {
     }
 
     container.innerHTML = html;
+    attachPerTableDownloadButtons(container);
 
     // Update active button state
     const teacherBtn = document.getElementById("teacherTimetableBtn");
     const studentBtn = document.getElementById("studentTimetableBtn");
     teacherBtn.classList.remove("active");
     studentBtn.classList.add("active");
+}
+
+function attachPerTableDownloadButtons(container) {
+    const buttons = container.querySelectorAll('.btn-download');
+    buttons.forEach(button => {
+        const view = button.dataset.view;
+        const key = decodeURIComponent(button.dataset.key || '');
+        button.addEventListener('click', () => downloadSingleTimetable(view, key));
+    });
+}
+
+async function downloadSingleTimetable(view, itemKey) {
+    const messageDiv = document.getElementById("downloadMessage");
+    const fileType = 'pdf';
+
+    try {
+        const response = await fetch(`${API_BASE}/download/${fileType}?view_type=${view}&item_key=${encodeURIComponent(itemKey)}`);
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${view}-${itemKey}-timetable.${fileType}`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            showMessage(messageDiv, `Downloaded ${view} timetable for ${itemKey}.`, "success");
+        } else {
+            const error = await response.json();
+            showMessage(messageDiv, error.error || "Error downloading timetable", "error");
+        }
+    } catch (error) {
+        showMessage(messageDiv, "Error: " + error.message, "error");
+    }
 }
 
 // ======================
@@ -1445,6 +1618,25 @@ function generatePeriodCells(schedule, day) {
     return html;
 }
 
+const SHORT_ACTIVITY_LABELS = {
+    'physical training': 'PT',
+    'pt': 'PT',
+    'mini project': 'MP',
+    'professional elective': 'PE',
+    'open elective': 'OE',
+    'skillrack/placement': 'SR/PM',
+    'skillrack placement': 'SR/PM',
+    'library': 'Lib',
+    'project phase / internship': 'PI',
+    'project phase internship': 'PI',
+};
+
+function getShortActivityLabel(name) {
+    if (!name || typeof name !== 'string') return name;
+    const normalized = name.trim().toLowerCase();
+    return SHORT_ACTIVITY_LABELS[normalized] || name;
+}
+
 function getCellClass(slot) {
     if (slot.type === "Free") return "free";
     if (slot.type === "Break") return "break";
@@ -1455,16 +1647,17 @@ function getCellClass(slot) {
 }
 
 function getSlotContent(slot) {
+    const subject = getShortActivityLabel(slot.subject);
     if (slot.type === "Free") return "";  // Blank for free periods
     if (slot.type === "Break") return "Break";
     if (slot.type === "Lab") {
-        return `<strong>${slot.subject}</strong><br><small>(${slot.class || 'N/A'})</small><br><span style="color: #e65100; font-weight: bold;">LAB</span>`;
+        return `<strong>${subject}</strong><br><small>(${slot.class || 'N/A'})</small><br><span style="color: #e65100; font-weight: bold;">LAB</span>`;
     }
     if (slot.type === "Activity") {
-        return `<strong>${slot.subject}</strong><br><small>(${slot.class || 'N/A'})</small>${slot.elective_no ? '<br><small style="color: #1565c0; font-weight: 500;">Elective No. ' + slot.elective_no + '</small>' : ''}`;
+        return `<strong>${subject}</strong><br><small>(${slot.class || 'N/A'})</small>${slot.elective_no ? '<br><small style="color: #1565c0; font-weight: 500;">Elective No. ' + slot.elective_no + '</small>' : ''}`;
     }
     if (slot.subject) {
-        return `<strong>${slot.subject}</strong><br><small>(${slot.class || 'N/A'})</small>`;
+        return `<strong>${subject}</strong><br><small>(${slot.class || 'N/A'})</small>`;
     }
     return "";
 }
@@ -1593,15 +1786,11 @@ function showMessage(element, message, type) {
 // ======================
 // INITIALIZATION
 // ======================
-document.addEventListener("DOMContentLoaded", function() {
-    console.log("Page loaded in isolated tab mode.");
-    
-    // Start with local data only - no backend auto-load
+document.addEventListener("DOMContentLoaded", async function() {
+    await loadActivities();
+    renderActivities();
     loadTeachers(0);
 });
-
-// NOTE: Removed visibilitychange handler that was auto-loading from backend
-// Each tab now works independently without syncing when tab gains focus
 
 function showLoadingIndicator() {
     const loadingDiv = document.getElementById("loadingIndicator");
