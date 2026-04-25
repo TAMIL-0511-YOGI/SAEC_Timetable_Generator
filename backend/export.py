@@ -45,11 +45,11 @@ def get_short_activity_name(name):
 
 def format_teacher_slot(slot):
     if not slot or slot.get("type") is None:
-        return ""
+        return "Free"
     if slot["type"] == "Break":
         return "Break"
     elif slot["type"] == "Free":
-        return ""
+        return "Free"
     elif slot["type"] == "R&D":
         return "R&D"
 
@@ -75,11 +75,11 @@ def format_teacher_slot(slot):
 
 def format_class_slot(slot):
     if not slot or slot.get("type") is None:
-        return ""
+        return "Free"
     if slot["type"] == "Break":
         return "Break"
     elif slot["type"] == "Free":
-        return ""
+        return "Free"
     elif slot["type"] == "R&D":
         return "R&D"
 
