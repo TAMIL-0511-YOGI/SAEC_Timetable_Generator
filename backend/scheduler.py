@@ -1,3 +1,4 @@
+import math
 import random
 from itertools import combinations
 
@@ -140,9 +141,8 @@ def schedule_labs_for_teacher(schedule, teacher):
     """Schedule lab periods for a teacher based on actual hours_per_week"""
     for subject in teacher.subjects:
         if subject.is_lab and subject.hours_per_week > 0:
-            # Each 3-period block = 3 hours, so allocate blocks accordingly
-            # hours_per_week / 3 = number of blocks needed
-            blocks_needed = subject.hours_per_week // 3
+            # Each 3-period block = 3 hours, so allocate enough blocks to cover the requested hours.
+            blocks_needed = math.ceil(subject.hours_per_week / 3)
             
             lab_day = subject.lab_days[0] if subject.lab_days else 0  # Use preferred day
             day = DAYS[lab_day]
@@ -451,7 +451,7 @@ def generate(teachers, activities=None):
     for group in lab_groups.values():
         subject = group['subject']
         teacher_ids = [str(tid) for tid in sorted(group['teacher_ids'])]
-        blocks_needed = max(1, subject.hours_per_week // 3)
+        blocks_needed = max(1, math.ceil(subject.hours_per_week / 3))
         allocated_blocks = 0
         attempts = 0
 
@@ -499,27 +499,30 @@ def generate(teachers, activities=None):
 
     # 2) Allocate theory/class periods while respecting teacher and class conflicts
     for teacher in teachers:
-        for subject in teacher.subjects:
-            if not subject.is_lab and subject.hours_per_week > 0:
-                hours_needed = subject.hours_per_week
-                allocated = 0
+        theory_subjects = sorted(
+            [subject for subject in teacher.subjects if not subject.is_lab and subject.hours_per_week > 0],
+            key=lambda s: -s.hours_per_week
+        )
 
-                all_slots = [(day, period) for day in DAYS for period in range(PERIODS)]
-                random.shuffle(all_slots)
+        for subject in theory_subjects:
+            hours_needed = subject.hours_per_week
+            allocated = 0
 
-                for day, period in all_slots:
+            for day in DAYS:
+                if allocated >= hours_needed:
+                    break
+                if getattr(teacher, 'rnd_day', None) == day:
+                    continue
+                if teacher_daily_load[teacher.teacher_id][day] >= 5:
+                    continue
+
+                for period in range(PERIODS):
                     if allocated >= hours_needed:
                         break
-
-                    if getattr(teacher, 'rnd_day', None) == day:
-                        continue
-
                     if teacher_daily_load[teacher.teacher_id][day] >= 5:
-                        continue
-
+                        break
                     if not is_slot_free(teacher_schedules[teacher.teacher_id], day, period):
                         continue
-
                     if not is_slot_free(class_schedules[subject.class_name], day, period):
                         continue
 
