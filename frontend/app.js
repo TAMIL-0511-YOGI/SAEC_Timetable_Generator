@@ -1678,7 +1678,7 @@ function getCellClass(slot) {
 function getSlotContent(slot) {
     const normalizedSlot = slot || { type: "Free", subject: null, class: null };
     const subject = getShortActivityLabel(normalizedSlot.subject);
-    if (normalizedSlot.type === "Free") return "Free";
+    if (normalizedSlot.type === "Free") return "";
     if (normalizedSlot.type === "Break") return "Break";
     if (normalizedSlot.type === "Lab") {
         return `<strong>${subject}</strong><br><small>(${normalizedSlot.class || 'N/A'})</small><br><span style="color: #e65100; font-weight: bold;">LAB</span>`;

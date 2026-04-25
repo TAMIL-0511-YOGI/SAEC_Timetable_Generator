@@ -466,11 +466,6 @@ def generate(teachers, activities=None):
                 attempts += 1
                 continue
 
-            # avoid overload for any assigned teacher on this day
-            if any(teacher_daily_load.get(tid, {}).get(day, 0) >= 5 for tid in teacher_ids):
-                attempts += 1
-                continue
-
             slot = random.choice(LAB_SLOTS)
             slot_key = (day, slot)
 
@@ -513,13 +508,9 @@ def generate(teachers, activities=None):
                     break
                 if getattr(teacher, 'rnd_day', None) == day:
                     continue
-                if teacher_daily_load[teacher.teacher_id][day] >= 5:
-                    continue
 
                 for period in range(PERIODS):
                     if allocated >= hours_needed:
-                        break
-                    if teacher_daily_load[teacher.teacher_id][day] >= 5:
                         break
                     if not is_slot_free(teacher_schedules[teacher.teacher_id], day, period):
                         continue
@@ -532,8 +523,7 @@ def generate(teachers, activities=None):
                     teacher_daily_load[teacher.teacher_id][day] += 1
                     allocated += 1
 
-    # 3) Ensure each teacher has 3-4 free periods per day by leaving unassigned slots as Free
-    # (This is inherently enforced by max 5 occupied periods per day above.)
+    # 3) Teacher free periods are left unassigned when a slot is unavailable or not needed.
 
     # 4) Attach the generated class schedules to the returned object
     # Map teacher and class schedules separately
