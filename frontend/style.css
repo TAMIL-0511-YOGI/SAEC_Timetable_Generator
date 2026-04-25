@@ -797,6 +797,12 @@ button:active {
     font-weight: 700;
 }
 
+.timetable td.rnd {
+    background: #fff59d;
+    color: #000;
+    font-weight: 700;
+}
+
 .day-cell {
     font-weight: 700;
     background: #e3ebff;
@@ -900,6 +906,12 @@ td.break {
     color: #6a1b9a;
     font-style: italic;
     font-weight: 500;
+}
+
+td.rnd {
+    background-color: #fff59d;
+    color: #000;
+    font-weight: 700;
 }
 
 td.class {

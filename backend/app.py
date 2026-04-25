@@ -37,12 +37,12 @@ def filter_timetable_data(timetable, view_type, item_key=None):
 
     if view_type == 'student':
         classes_timetable = timetable.get('classes', {})
-        if item_key:
-            classes_timetable = {k: v for k, v in classes_timetable.items() if k == item_key}
+        if item_key is not None and item_key != "":
+            classes_timetable = {k: v for k, v in classes_timetable.items() if str(k) == str(item_key)}
     else:
         teachers_timetable = timetable.get('teachers', {})
-        if item_key:
-            teachers_timetable = {k: v for k, v in teachers_timetable.items() if k == item_key}
+        if item_key is not None and item_key != "":
+            teachers_timetable = {k: v for k, v in teachers_timetable.items() if str(k) == str(item_key)}
 
     return teachers_timetable, classes_timetable
 

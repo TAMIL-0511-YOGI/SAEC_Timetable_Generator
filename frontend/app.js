@@ -1262,7 +1262,7 @@ function displayTeacherDatabase(teachers) {
                 <div style="min-width:0; flex:1;">
                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         <h3 style="margin:0; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${teacher.name} (ID: ${teacher.teacher_id})</h3>
-                        ${teacher.rnd_day ? `<span style="display:inline-block; padding: 4px 10px; border-radius: 999px; background: #2e7d32; color: #fff; font-size: 0.78rem; font-weight: 700;">R&D ${teacher.rnd_day}</span>` : '<span style="display:inline-block; padding: 4px 10px; border-radius: 999px; background: #f1f1f1; color: #555; font-size: 0.78rem;">No R&D Day</span>'}
+                        ${teacher.rnd_day ? `<span style="display:inline-block; padding: 4px 10px; border-radius: 999px; background: #ffeb3b; color: #000; font-size: 0.78rem; font-weight: 700; border: 1px solid #fdd835;">R&D ${teacher.rnd_day}</span>` : '<span style="display:inline-block; padding: 4px 10px; border-radius: 999px; background: #f1f1f1; color: #555; font-size: 0.78rem;">No R&D Day</span>'}
                     </div>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -1419,7 +1419,7 @@ async function generateTimetable() {
 // ======================
 // DISPLAY TIMETABLE
 // ======================
-function buildTimetableSection(title, scheduleData, labelMapper = (key) => key) {
+function buildTimetableSection(title, scheduleData, labelMapper = (key) => key, metaMapper = null) {
     const events = Object.keys(scheduleData);
     if (events.length === 0) {
         return `<div class="section"><p style="color:#666;">No ${title.toLowerCase()} generated.</p></div>`;
@@ -1428,6 +1428,7 @@ function buildTimetableSection(title, scheduleData, labelMapper = (key) => key) 
     return events.map(key => {
         const schedule = scheduleData[key];
         const displayLabel = labelMapper(key);
+        const extraMetaHtml = metaMapper ? metaMapper(key) : '';
         const downloadView = title === 'Class' ? 'student' : 'teacher';
         return `
             <div class="teacher-timetable">
@@ -1437,6 +1438,7 @@ function buildTimetableSection(title, scheduleData, labelMapper = (key) => key) 
                         ⬇ Download
                     </button>
                 </div>
+                ${extraMetaHtml}
                 <table class="timetable">
                     <thead>
                         <tr>
@@ -1461,12 +1463,14 @@ function buildTimetableSection(title, scheduleData, labelMapper = (key) => key) 
 // Global variable to store timetable data for toggling between views
 let currentTimetableData = null;
 let currentTeacherNameMap = null;
+let currentTeacherMetaMap = null;
 let currentTimetableView = 'teacher';
 
 async function displayTimetable(timetable) {
     const teacherResponse = await fetch(`${API_BASE}/teachers`);
     const teacherList = await teacherResponse.json();
     const teacherNameMap = new Map(teacherList.map(t => [t.teacher_id, t.name]));
+    const teacherMetaMap = new Map(teacherList.map(t => [t.teacher_id, { name: t.name, rnd_day: t.rnd_day || '' }]));
 
     const teacherSchedules = timetable.teachers || timetable;
     const classSchedules = timetable.classes || {};
@@ -1477,6 +1481,7 @@ async function displayTimetable(timetable) {
         classes: classSchedules
     };
     currentTeacherNameMap = teacherNameMap;
+    currentTeacherMetaMap = teacherMetaMap;
 
     // Show the default view depending on the current state
     if (currentTimetableView === 'student') {
@@ -1512,7 +1517,16 @@ function showTeachersTimetables() {
     let html = "";
 
     html += `<section class="section"><h2>Consolidated Teacher Timetables</h2></section>`;
-    html += buildTimetableSection("Teacher", currentTimetableData.teachers, key => currentTeacherNameMap.get(key) || key);
+    html += buildTimetableSection("Teacher", currentTimetableData.teachers, key => {
+        const meta = currentTeacherMetaMap ? currentTeacherMetaMap.get(key) : null;
+        if (meta) {
+            return meta.name;
+        }
+        return key;
+    }, key => {
+        const meta = currentTeacherMetaMap ? currentTeacherMetaMap.get(key) : null;
+        return meta && meta.rnd_day ? `<div class="rnd-day-card" style="margin:0 0 12px;padding:10px 14px;border-radius:12px;background:#ffeb3b;color:#000;font-weight:700;display:inline-block;letter-spacing:0.3px;border:1px solid #fdd835;">R&D Day: ${meta.rnd_day}</div>` : '';
+    });
 
     if (activities && activities.length > 0) {
         html += `<section class="section"><h2>Institutional Activities</h2><div class="activity-list">`;
@@ -1569,8 +1583,23 @@ async function downloadSingleTimetable(view, itemKey) {
     const messageDiv = document.getElementById("downloadMessage");
     const fileType = 'pdf';
 
+    if (!currentTimetableData) {
+        showMessage(messageDiv, "No generated timetable available for download.", "error");
+        return;
+    }
+
     try {
-        const response = await fetch(`${API_BASE}/download/${fileType}?view_type=${view}&item_key=${encodeURIComponent(itemKey)}`);
+        const response = await fetch(`${API_BASE}/download/${fileType}?view_type=${view}&item_key=${encodeURIComponent(itemKey)}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                timetable: currentTimetableData,
+                view_type: view,
+                item_key: itemKey
+            })
+        });
 
         if (response.ok) {
             const blob = await response.blob();
@@ -1595,12 +1624,10 @@ async function downloadSingleTimetable(view, itemKey) {
 // ======================
 function generatePeriodCells(schedule, day) {
     let html = "";
-    const daySchedule = schedule[day];
-    
-    if (!daySchedule) return html;
+    const daySchedule = schedule && schedule[day] ? schedule[day] : Array.from({ length: 8 }, () => ({ type: "Free", subject: null, class: null }));
     
     for (let i = 0; i < 8; i++) {
-        const slot = daySchedule[i];
+        const slot = daySchedule[i] || { type: "Free", subject: null, class: null };
         const cellClass = getCellClass(slot);
         const content = getSlotContent(slot);
         html += `<td class="${cellClass}">${content}</td>`;
@@ -1638,26 +1665,40 @@ function getShortActivityLabel(name) {
 }
 
 function getCellClass(slot) {
-    if (slot.type === "Free") return "free";
-    if (slot.type === "Break") return "break";
-    if (slot.type === "Lab") return "lab";
-    if (slot.type === "Class") return "class";
-    if (slot.type === "Activity") return "activity";
-    return "";
+    const normalizedSlot = slot || { type: "Free" };
+    if (normalizedSlot.type === "Free") return "free";
+    if (normalizedSlot.type === "Break") return "break";
+    if (normalizedSlot.type === "R&D") return "rnd";
+    if (normalizedSlot.type === "Lab") return "lab";
+    if (normalizedSlot.type === "Class") return "class";
+    if (normalizedSlot.type === "Activity") return "activity";
+    return "free";
 }
 
 function getSlotContent(slot) {
-    const subject = getShortActivityLabel(slot.subject);
-    if (slot.type === "Free") return "";  // Blank for free periods
-    if (slot.type === "Break") return "Break";
-    if (slot.type === "Lab") {
-        return `<strong>${subject}</strong><br><small>(${slot.class || 'N/A'})</small><br><span style="color: #e65100; font-weight: bold;">LAB</span>`;
+    const normalizedSlot = slot || { type: "Free", subject: null, class: null };
+    const subject = getShortActivityLabel(normalizedSlot.subject);
+    if (normalizedSlot.type === "Free") return "";
+    if (normalizedSlot.type === "Break") return "Break";
+    if (normalizedSlot.type === "Lab") {
+        return `<strong>${subject}</strong><br><small>(${normalizedSlot.class || 'N/A'})</small><br><span style="color: #e65100; font-weight: bold;">LAB</span>`;
     }
-    if (slot.type === "Activity") {
-        return `<strong>${subject}</strong><br><small>(${slot.class || 'N/A'})</small>${slot.elective_no ? '<br><small style="color: #1565c0; font-weight: 500;">Elective No. ' + slot.elective_no + '</small>' : ''}`;
+    if (normalizedSlot.type === "Activity") {
+        let content = `<strong>${subject}</strong>`;
+        if (normalizedSlot.class) {
+            content += `<br><small>(${normalizedSlot.class})</small>`;
+        }
+        if (normalizedSlot.elective_no) {
+            content += `<br><small style="color: #1565c0; font-weight: 500;">Elective No. ${normalizedSlot.elective_no}</small>`;
+        }
+        return content;
     }
-    if (slot.subject) {
-        return `<strong>${subject}</strong><br><small>(${slot.class || 'N/A'})</small>`;
+    if (normalizedSlot.subject) {
+        let content = `<strong>${subject}</strong>`;
+        if (normalizedSlot.class) {
+            content += `<br><small>(${normalizedSlot.class})</small>`;
+        }
+        return content;
     }
     return "";
 }
@@ -1669,8 +1710,22 @@ async function downloadExcel() {
     const messageDiv = document.getElementById("downloadMessage");
     const view = currentTimetableView === 'student' ? 'student' : 'teacher';
     
+    if (!currentTimetableData) {
+        showMessage(messageDiv, "No generated timetable available for download.", "error");
+        return;
+    }
+
     try {
-        const response = await fetch(`${API_BASE}/download/excel?view_type=${view}`);
+        const response = await fetch(`${API_BASE}/download/excel?view_type=${view}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                timetable: currentTimetableData,
+                view_type: view
+            })
+        });
         
         if (response.ok) {
             const blob = await response.blob();
@@ -1694,8 +1749,22 @@ async function downloadPDF() {
     const messageDiv = document.getElementById("downloadMessage");
     const view = currentTimetableView === 'student' ? 'student' : 'teacher';
     
+    if (!currentTimetableData) {
+        showMessage(messageDiv, "No generated timetable available for download.", "error");
+        return;
+    }
+
     try {
-        const response = await fetch(`${API_BASE}/download/pdf?view_type=${view}`);
+        const response = await fetch(`${API_BASE}/download/pdf?view_type=${view}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                timetable: currentTimetableData,
+                view_type: view
+            })
+        });
         
         if (response.ok) {
             const blob = await response.blob();
