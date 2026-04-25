@@ -1,5 +1,5 @@
 class Subject:
-    def __init__(self, name, year, section, hours_per_week, is_lab=False, lab_days=None, subject_id=None):
+    def __init__(self, name, year, section, hours_per_week, is_lab=False, lab_days=None, teacher_ids=None, subject_id=None):
         self.subject_id = subject_id  # Database ID
         self.name = name  # e.g., "AAI", "OOPS", "DS"
         self.year = year  # 1st, 2nd, 3rd, 4th
@@ -7,6 +7,7 @@ class Subject:
         self.hours_per_week = hours_per_week  # Total hours needed per week
         self.is_lab = is_lab  # True if lab period
         self.lab_days = lab_days or []  # [0, 2] for Mon, Wed if is_lab=True
+        self.teacher_ids = teacher_ids or []
         self.class_name = f"{year}{section}"  # e.g., "3A", "2B"
         self.assigned_periods = []  # List of (day, period) tuples
 
@@ -19,14 +20,16 @@ class Subject:
             'hours_per_week': self.hours_per_week,
             'is_lab': self.is_lab,
             'lab_days': self.lab_days,
+            'teacher_ids': self.teacher_ids,
             'class_name': self.class_name
         }
 
 
 class Teacher:
-    def __init__(self, teacher_id, name):
+    def __init__(self, teacher_id, name, rnd_day=''):
         self.teacher_id = teacher_id
         self.name = name
+        self.rnd_day = rnd_day or ''
         self.subjects = []  # List of Subject objects
         self.total_hours_per_week = 0
         self.assigned_periods = []  # List of (day, period, subject_name, class_name)
@@ -49,6 +52,7 @@ class Teacher:
         return {
             'teacher_id': self.teacher_id,
             'name': self.name,
+            'rnd_day': self.rnd_day,
             'subjects': [s.to_dict() for s in self.subjects],
             'total_hours_per_week': self.total_hours_per_week,
             'free_periods_count': self.free_periods_count

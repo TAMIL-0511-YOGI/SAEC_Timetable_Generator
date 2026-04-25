@@ -728,6 +728,32 @@ button:active {
     -webkit-overflow-scrolling: touch;
 }
 
+.timetable-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.btn-download {
+    border: none;
+    background: #1976d2;
+    color: white;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-download:hover {
+    background: #115293;
+    transform: translateY(-1px);
+}
+
 .timetable {
     width: 100%;
     min-width: 1000px;

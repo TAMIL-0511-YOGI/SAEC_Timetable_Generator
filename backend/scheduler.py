@@ -44,6 +44,13 @@ def allocate_lab_block(schedule, day, periods_tuple, subject_name, class_name):
     return False
 
 
+def mark_rnd_day_unavailable(schedule, rnd_day):
+    """Mark the teacher schedule as unavailable for the R&D day."""
+    if rnd_day in DAYS:
+        for period in range(PERIODS):
+            schedule[rnd_day][period] = {"type": "R&D", "subject": "R&D", "class": None}
+
+
 def find_teacher_matches(teachers, activity_teacher_names):
     """Return teacher objects matching activity teacher names/ids (case-insensitive)."""
     normalized_names = {name.strip().lower() for name in activity_teacher_names if isinstance(name, str) and name.strip()}
@@ -64,9 +71,9 @@ def allocate_activity(schedule, day, period_indices, activity_name, class_name=N
     Args:
         force: If True, attempt to allocate even if slots are occupied, but preserve fixed manual activities.
     """
-    locked_subjects = {"PT", "Library", "Project Phase / Internship", "Professional Elective", "Open Elective"}
+    locked_subjects = {"PT", "Library", "Project Phase / Internship", "Professional Elective", "Open Elective", "R&D"}
 
-    # If any slot in interval is fixed manual activity, fail allocation.
+    # If any slot in interval is fixed manual activity or R&D, fail allocation.
     if any((not is_slot_free(schedule, day, p)) and (schedule[day][p]["subject"] in locked_subjects) for p in period_indices):
         return False
 
@@ -198,6 +205,11 @@ def generate(teachers, activities=None):
     # Create empty schedules
     teacher_schedules = {teacher.teacher_id: create_empty_schedule() for teacher in teachers}
     class_schedules = {class_name: create_empty_schedule() for class_name in class_names}
+
+    # Apply teacher R&D day blocks before allocation
+    for teacher in teachers:
+        if getattr(teacher, 'rnd_day', None) in DAYS:
+            mark_rnd_day_unavailable(teacher_schedules[teacher.teacher_id], teacher.rnd_day)
 
     # Keep teacher daily load counters to enforce 3-4 free periods per day (max 5 occupied periods each day)
     teacher_daily_load = {teacher.teacher_id: {day: 0 for day in DAYS} for teacher in teachers}
@@ -426,49 +438,64 @@ def generate(teachers, activities=None):
             continue
 
     # 1) Allocate lab sessions first (3-period sessions)
+    # Group labs by unique subject assignment so all assigned teachers share the same lab slot.
+    lab_groups = {}
     for teacher in teachers:
         for subject in teacher.subjects:
             if subject.is_lab and subject.hours_per_week > 0:
-                blocks_needed = max(1, subject.hours_per_week // 3)
-                allocated_blocks = 0
-                attempts = 0
+                lab_groups.setdefault(subject.subject_id, {
+                    'subject': subject,
+                    'teacher_ids': set(subject.teacher_ids or [teacher.teacher_id])
+                })['teacher_ids'].update(subject.teacher_ids or [teacher.teacher_id])
 
-                available_days = DAYS.copy()
-                random.shuffle(available_days)
+    for group in lab_groups.values():
+        subject = group['subject']
+        teacher_ids = [str(tid) for tid in sorted(group['teacher_ids'])]
+        blocks_needed = max(1, subject.hours_per_week // 3)
+        allocated_blocks = 0
+        attempts = 0
 
-                while allocated_blocks < blocks_needed and attempts < 200:
-                    day = random.choice(available_days)
+        available_days = DAYS.copy()
+        random.shuffle(available_days)
 
-                    # avoid teacher overload on this day
-                    if teacher_daily_load[teacher.teacher_id][day] >= 5:
-                        attempts += 1
-                        continue
+        while allocated_blocks < blocks_needed and attempts < 300:
+            day = random.choice(available_days)
 
-                    slot = random.choice(LAB_SLOTS)
-                    slot_key = (day, slot)
+            # skip any assigned teacher's R&D day
+            if any(getattr(next((t for t in teachers if str(t.teacher_id) == tid), None), 'rnd_day', None) == day for tid in teacher_ids):
+                attempts += 1
+                continue
 
-                    if slot_key in global_lab_slots:
-                        attempts += 1
-                        continue
+            # avoid overload for any assigned teacher on this day
+            if any(teacher_daily_load.get(tid, {}).get(day, 0) >= 5 for tid in teacher_ids):
+                attempts += 1
+                continue
 
-                    if not is_consecutive_free(teacher_schedules[teacher.teacher_id], day, slot):
-                        attempts += 1
-                        continue
+            slot = random.choice(LAB_SLOTS)
+            slot_key = (day, slot)
 
-                    if not is_consecutive_free(class_schedules[subject.class_name], day, slot):
-                        attempts += 1
-                        continue
+            if slot_key in global_lab_slots:
+                attempts += 1
+                continue
 
-                    # Assign block to both teacher and class schedules
-                    allocate_lab_block(teacher_schedules[teacher.teacher_id], day, slot, subject.name, subject.class_name)
-                    allocate_lab_block(class_schedules[subject.class_name], day, slot, subject.name, subject.class_name)
+            if not is_consecutive_free(class_schedules[subject.class_name], day, slot):
+                attempts += 1
+                continue
 
-                    for p in slot:
-                        teacher_daily_load[teacher.teacher_id][day] += 1
+            if any(not is_consecutive_free(teacher_schedules[tid], day, slot) for tid in teacher_ids):
+                attempts += 1
+                continue
 
-                    global_lab_slots.add(slot_key)
-                    allocated_blocks += 1
-                    attempts += 1
+            # Assign block to class and all assigned teachers
+            allocate_lab_block(class_schedules[subject.class_name], day, slot, subject.name, subject.class_name)
+            for tid in teacher_ids:
+                allocate_lab_block(teacher_schedules[tid], day, slot, subject.name, subject.class_name)
+                for p in slot:
+                    teacher_daily_load[tid][day] += 1
+
+            global_lab_slots.add(slot_key)
+            allocated_blocks += 1
+            attempts += 1
 
     # 2) Allocate theory/class periods while respecting teacher and class conflicts
     for teacher in teachers:
@@ -483,6 +510,9 @@ def generate(teachers, activities=None):
                 for day, period in all_slots:
                     if allocated >= hours_needed:
                         break
+
+                    if getattr(teacher, 'rnd_day', None) == day:
+                        continue
 
                     if teacher_daily_load[teacher.teacher_id][day] >= 5:
                         continue

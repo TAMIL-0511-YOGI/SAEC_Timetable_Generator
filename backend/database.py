@@ -3,7 +3,8 @@ import os
 import json
 from models import Teacher, Subject
 
-DB_PATH = "timetable.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "timetable.db")
 
 def init_db():
     """Initialize database with proper schema"""
@@ -13,7 +14,8 @@ def init_db():
     # Teachers table
     c.execute('''CREATE TABLE IF NOT EXISTS teachers (
                     teacher_id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL
+                    name TEXT NOT NULL,
+                    rnd_day TEXT DEFAULT ''
                 )''')
     
     # Subjects table
@@ -26,6 +28,7 @@ def init_db():
                     is_lab BOOLEAN DEFAULT 0,
                     lab_days TEXT DEFAULT '',
                     teacher_id TEXT NOT NULL,
+                    teacher_ids TEXT DEFAULT '',
                     FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id)
                 )''')
     
@@ -60,6 +63,22 @@ def init_db():
                     occurrence_count INTEGER DEFAULT 1
                 )''')
     
+    # Ensure legacy databases get the new rnd_day column
+    c.execute("PRAGMA table_info(teachers)")
+    teacher_columns = [row[1] for row in c.fetchall()]
+    if 'rnd_day' not in teacher_columns:
+        c.execute("ALTER TABLE teachers ADD COLUMN rnd_day TEXT DEFAULT ''")
+    
+    conn.commit()
+    conn.close()
+
+    # Ensure legacy subjects table has teacher_ids for shared lab assignments
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(subjects)")
+    subject_columns = [row[1] for row in c.fetchall()]
+    if 'teacher_ids' not in subject_columns:
+        c.execute("ALTER TABLE subjects ADD COLUMN teacher_ids TEXT DEFAULT ''")
     conn.commit()
     conn.close()
 
@@ -67,23 +86,25 @@ def connect():
     """Connect to database"""
     return sqlite3.connect(DB_PATH)
 
-def add_teacher(teacher_id, name):
+def add_teacher(teacher_id, name, rnd_day=''):
     """Add a new teacher"""
     conn = connect()
     c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO teachers (teacher_id, name) VALUES (?, ?)", 
-              (teacher_id, name))
+    c.execute("INSERT OR REPLACE INTO teachers (teacher_id, name, rnd_day) VALUES (?, ?, ?)", 
+              (teacher_id, name, rnd_day or ''))
     conn.commit()
     conn.close()
 
-def add_subject(subject_name, year, section, hours_per_week, teacher_id, is_lab=0, lab_days=''):
-    """Add a subject to a teacher"""
+def add_subject(subject_name, year, section, hours_per_week, teacher_id, is_lab=0, lab_days='', teacher_ids=None):
+    """Add a subject to a teacher or multiple teachers"""
     conn = connect()
     c = conn.cursor()
+    teacher_ids_list = teacher_ids if isinstance(teacher_ids, list) else [teacher_id]
+    teacher_ids_str = json.dumps(teacher_ids_list)
     c.execute('''INSERT INTO subjects 
-                 (name, year, section, hours_per_week, is_lab, lab_days, teacher_id) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?)''', 
-              (subject_name, year, section, hours_per_week, is_lab, lab_days, teacher_id))
+                 (name, year, section, hours_per_week, is_lab, lab_days, teacher_id, teacher_ids) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)''', 
+              (subject_name, year, section, hours_per_week, is_lab, lab_days, teacher_id, teacher_ids_str))
     conn.commit()
     conn.close()
 
@@ -95,21 +116,34 @@ def get_all_teachers():
     c.execute("SELECT * FROM teachers")
     teachers_data = c.fetchall()
     
-    teachers = []
-    for t in teachers_data:
-        teacher = Teacher(t['teacher_id'], t['name'])
-        
-        # Get subjects for this teacher
-        c.execute("SELECT * FROM subjects WHERE teacher_id = ?", (t['teacher_id'],))
-        subjects_data = c.fetchall()
-        
-        for s in subjects_data:
-            # Convert lab_days from string to list of integers
-            if s['lab_days'] and s['lab_days'].strip():
-                lab_days = [int(x.strip()) for x in s['lab_days'].split(',')]
-            else:
-                lab_days = []
-            
+    teachers = {t['teacher_id']: Teacher(t['teacher_id'], t['name'], rnd_day=t['rnd_day'] if 'rnd_day' in t.keys() else '') for t in teachers_data}
+
+    c.execute("SELECT * FROM subjects")
+    subjects_data = c.fetchall()
+
+    for s in subjects_data:
+        # Convert lab_days from string to list of integers
+        if s['lab_days'] and s['lab_days'].strip():
+            lab_days = [int(x.strip()) for x in s['lab_days'].split(',')]
+        else:
+            lab_days = []
+
+        # Convert teacher_ids JSON string or fallback to the main teacher_id
+        try:
+            teacher_ids = json.loads(s['teacher_ids']) if s['teacher_ids'] else []
+            if not isinstance(teacher_ids, list):
+                teacher_ids = [str(teacher_ids)]
+        except Exception:
+            teacher_ids = [str(s['teacher_id'])]
+
+        if not teacher_ids:
+            teacher_ids = [str(s['teacher_id'])]
+
+        for teacher_id in teacher_ids:
+            teacher = teachers.get(str(teacher_id))
+            if not teacher:
+                continue
+
             subject = Subject(
                 name=s['name'],
                 year=s['year'],
@@ -117,14 +151,13 @@ def get_all_teachers():
                 hours_per_week=s['hours_per_week'],
                 is_lab=bool(s['is_lab']),
                 lab_days=lab_days,
+                teacher_ids=teacher_ids,
                 subject_id=s['subject_id']
             )
             teacher.add_subject(subject)
-        
-        teachers.append(teacher)
-    
+
     conn.close()
-    return teachers
+    return list(teachers.values())
 
 def delete_subject(subject_id):
     """Delete a specific subject by ID"""
@@ -145,23 +178,33 @@ def delete_teacher(teacher_id):
     conn.close()
 
 
-def update_teacher(teacher_id, name):
-    """Update teacher name"""
+def update_teacher(teacher_id, name, rnd_day=None):
+    """Update teacher name and optional R&D day"""
     conn = connect()
     c = conn.cursor()
-    c.execute("UPDATE teachers SET name = ? WHERE teacher_id = ?", (name, teacher_id))
+    if rnd_day is None:
+        c.execute("UPDATE teachers SET name = ? WHERE teacher_id = ?", (name, teacher_id))
+    else:
+        c.execute("UPDATE teachers SET name = ?, rnd_day = ? WHERE teacher_id = ?", (name, rnd_day or '', teacher_id))
     conn.commit()
     conn.close()
 
 
-def update_subject(subject_id, subject_name, year, section, hours_per_week, is_lab=0):
+def update_subject(subject_id, subject_name, year, section, hours_per_week, is_lab=0, teacher_ids=None):
     """Update a specific subject"""
     conn = connect()
     c = conn.cursor()
-    c.execute('''UPDATE subjects 
-                 SET name = ?, year = ?, section = ?, hours_per_week = ?, is_lab = ?
-                 WHERE subject_id = ?''', 
-              (subject_name, year, section, hours_per_week, is_lab, subject_id))
+    if teacher_ids is not None:
+        teacher_ids_str = json.dumps(teacher_ids if isinstance(teacher_ids, list) else [teacher_ids])
+        c.execute('''UPDATE subjects 
+                     SET name = ?, year = ?, section = ?, hours_per_week = ?, is_lab = ?, teacher_ids = ?
+                     WHERE subject_id = ?''', 
+                  (subject_name, year, section, hours_per_week, is_lab, teacher_ids_str, subject_id))
+    else:
+        c.execute('''UPDATE subjects 
+                     SET name = ?, year = ?, section = ?, hours_per_week = ?, is_lab = ?
+                     WHERE subject_id = ?''', 
+                  (subject_name, year, section, hours_per_week, is_lab, subject_id))
     conn.commit()
     conn.close()
 

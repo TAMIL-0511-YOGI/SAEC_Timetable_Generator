@@ -82,10 +82,18 @@
             <!-- Teacher Input Section -->
             <section class="section">
                 <h2>Add Teacher</h2>
-                <div class="form-group">
+                <div class="form-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                     <input type="text" id="teacherId" placeholder="Teacher ID (e.g., T001)" required>
                     <input type="text" id="teacherName" placeholder="Teacher Name" required>
-                    <button onclick="addTeacher()" class="btn-primary">Add Teacher</button>
+                    <select id="teacherRndDay">
+                        <option value="">R&D Day (optional)</option>
+                        <option value="Mon">Monday</option>
+                        <option value="Tue">Tuesday</option>
+                        <option value="Wed">Wednesday</option>
+                        <option value="Thu">Thursday</option>
+                        <option value="Fri">Friday</option>
+                    </select>
+                    <button onclick="addTeacher()" class="btn-primary" style="min-width: 140px;">Add Teacher</button>
                 </div>
                 <div id="teacherMessage" class="message"></div>
             </section>
@@ -106,6 +114,14 @@
                     <label style="display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 500;">
                         <input type="checkbox" id="isLab"> Is Lab Period?
                     </label>
+                </div>
+                <div id="labTeacherSelectors" style="display:none; flex-wrap: wrap; gap: 12px; margin-top: 8px;">
+                    <select id="labTeacher2Select" class="teacher-select">
+                        <option value="">Select Teacher 2</option>
+                    </select>
+                    <select id="labTeacher3Select" class="teacher-select">
+                        <option value="">Select Teacher 3</option>
+                    </select>
                 </div>
                 <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
                     <button onclick="addSubject()" class="btn-primary" style="width: 160px;">Add Subject</button>
@@ -433,6 +449,6 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=2"></script>
 </body>
 </html>
