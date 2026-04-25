@@ -51,9 +51,9 @@ def remove_existing_export_file(path):
     if os.path.exists(path):
         try:
             os.remove(path)
-            print(f"Removed old export file: {path}")
+            print("Removed old export file.")
         except Exception as e:
-            print(f"Unable to remove old export file {path}: {e}")
+            print(f"Unable to remove old export file: {e}")
 
 @app.route("/")
 def index():
@@ -207,16 +207,19 @@ def gen_timetable():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/download/excel", methods=["GET"])
+@app.route("/api/download/excel", methods=["GET", "POST"])
 def download_excel():
     """Download timetable as Excel"""
     try:
-        if latest_timetable is None:
+        request_data = request.get_json(silent=True) or {}
+        view_type = request.args.get('view_type') or request_data.get('view_type', 'teacher')
+        item_key = request.args.get('item_key') or request_data.get('item_key')
+        timetable = request_data.get('timetable') or latest_timetable
+
+        if timetable is None:
             return jsonify({"error": "No timetable generated yet"}), 400
 
-        view_type = request.args.get('view_type', 'teacher')
-        item_key = request.args.get('item_key')
-        teachers_timetable, classes_timetable = filter_timetable_data(latest_timetable, view_type, item_key)
+        teachers_timetable, classes_timetable = filter_timetable_data(timetable, view_type, item_key)
 
         if view_type == 'student':
             if not classes_timetable:
@@ -232,20 +235,23 @@ def download_excel():
         remove_existing_export_file(EXCEL_FILE)
         export_excel(teachers_timetable, classes_timetable, output_path=EXCEL_FILE)
 
-        return send_file(EXCEL_FILE, as_attachment=True)
+        return send_file(EXCEL_FILE, as_attachment=True, download_name=os.path.basename(EXCEL_FILE), mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/download/pdf", methods=["GET"])
+@app.route("/api/download/pdf", methods=["GET", "POST"])
 def download_pdf():
     """Download timetable as PDF"""
     try:
-        if latest_timetable is None:
+        request_data = request.get_json(silent=True) or {}
+        view_type = request.args.get('view_type') or request_data.get('view_type', 'teacher')
+        item_key = request.args.get('item_key') or request_data.get('item_key')
+        timetable = request_data.get('timetable') or latest_timetable
+
+        if timetable is None:
             return jsonify({"error": "No timetable generated yet"}), 400
 
-        view_type = request.args.get('view_type', 'teacher')
-        item_key = request.args.get('item_key')
-        teachers_timetable, classes_timetable = filter_timetable_data(latest_timetable, view_type, item_key)
+        teachers_timetable, classes_timetable = filter_timetable_data(timetable, view_type, item_key)
 
         if view_type == 'student':
             if not classes_timetable:
@@ -260,7 +266,7 @@ def download_pdf():
         
         remove_existing_export_file(PDF_FILE)
         export_pdf(teachers_timetable, classes_timetable, output_path=PDF_FILE)
-        return send_file(PDF_FILE, as_attachment=True)
+        return send_file(PDF_FILE, as_attachment=True, download_name=os.path.basename(PDF_FILE), mimetype='application/pdf')
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

@@ -35,8 +35,8 @@ def export_excel(teacher_timetable, class_timetable=None, output_path="timetable
         output_path = os.path.abspath(output_path)
         if os.path.exists(output_path):
             os.remove(output_path)
-            print(f"Removed existing Excel output file: {output_path}")
-        print(f"\n=== EXCEL EXPORT START ===")
+            print("Removed existing Excel output file.")
+        print("\n=== EXCEL EXPORT START ===")
         print(f"Teachers to export: {list(teacher_timetable.keys())}")
         print(f"Total teachers: {len(teacher_timetable)}")
         print(f"Classes to export: {list(class_timetable.keys()) if class_timetable else 'None'}")
@@ -284,8 +284,8 @@ def export_excel(teacher_timetable, class_timetable=None, output_path="timetable
                     print(f"All {exported_classes} classes exported to 'Students Timetable' sheet with formatting")
         
         print(f"Total teachers exported: {exported_teachers}")
-        print(f"Excel file saved: {output_path}")
-        print(f"=== EXCEL EXPORT COMPLETE ===\n")
+        print("Excel file saved.")
+        print("=== EXCEL EXPORT COMPLETE ===\n")
         
     except Exception as e:
         print(f"FATAL ERROR in export_excel: {str(e)}")
@@ -298,8 +298,8 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
         output_path = os.path.abspath(output_path)
         if os.path.exists(output_path):
             os.remove(output_path)
-            print(f"Removed existing PDF output file: {output_path}")
-        print(f"\n=== PDF EXPORT START ===")
+            print("Removed existing PDF output file.")
+        print("\n=== PDF EXPORT START ===")
         print(f"Teachers to export: {list(teacher_timetable.keys())}")
         print(f"Total teachers: {len(teacher_timetable)}")
         print(f"Classes to export: {list(class_timetable.keys()) if class_timetable else 'None'}")
@@ -340,6 +340,19 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
             spaceBefore=12
         )
         
+        rnd_style = ParagraphStyle(
+            'RndTag',
+            parent=styles['Normal'],
+            fontSize=11,
+            backColor=colors.HexColor('#e8f4ff'),
+            textColor=colors.HexColor('#0e3d7b'),
+            leftIndent=0,
+            rightIndent=0,
+            spaceAfter=10,
+            spaceBefore=0,
+            borderPadding=6
+        )
+        
         class_style = ParagraphStyle(
             'ClassName',
             parent=styles['Heading2'],
@@ -373,6 +386,8 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                 # Teacher name - bold and prominent
                 teacher_name_text = f"<b><font size=12>{teacher.name}</font></b>"
                 story.append(Paragraph(teacher_name_text, teacher_style))
+                if getattr(teacher, 'rnd_day', None):
+                    story.append(Paragraph(f"R&D Day: {teacher.rnd_day}", rnd_style))
                 
                 # Build table data
                 table_data = []
@@ -392,7 +407,24 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
                         elif slot["type"] == "R&D":
                             row.append("R&D")
                         else:
-                                subject = get_short_activity_name(slot.get("subject", ""))
+                            subject = get_short_activity_name(slot.get("subject", ""))
+                            entry_type = slot.get("type", "Class")
+                            class_name = slot.get("class", "")
+                            elective_no = slot.get("elective_no")
+                            if entry_type == "Lab":
+                                if class_name:
+                                    row.append(f"{subject}\n({class_name})\n[LAB]")
+                                else:
+                                    row.append(f"{subject}\n[LAB]")
+                            elif entry_type == "Activity":
+                                activity_label = subject
+                                if class_name:
+                                    activity_label += f"\n({class_name})"
+                                if elective_no:
+                                    activity_label += f"\nElective No. {elective_no}"
+                                row.append(activity_label)
+                            else:
+                                row.append(subject + (f"\n({class_name})" if class_name else ""))
                     table_data.append(row)
                     if "R&D" in row[1:]:
                         r_and_d_rows.append(len(table_data) - 1)
@@ -526,8 +558,8 @@ def export_pdf(teacher_timetable, class_timetable=None, output_path="timetable.p
         
         doc.build(story)
         print(f"Total teachers exported: {exported_teachers}")
-        print(f"PDF file saved: {output_path}")
-        print(f"=== PDF EXPORT COMPLETE ===\n")
+        print("PDF file saved.")
+        print("=== PDF EXPORT COMPLETE ===\n")
         
     except Exception as e:
         print(f"FATAL ERROR in export_pdf: {str(e)}")
